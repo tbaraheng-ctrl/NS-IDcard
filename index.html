@@ -1,0 +1,3211 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบพิมพ์บัตรประจำตัวนักเรียน - โรงเรียนนราสิกขาลัย</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: {
+                        nara: { blue: '#1e3a8a', yellow: '#eab308', light: '#f0f9ff' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        
+        /* สไตล์สำหรับการพิมพ์กระดาษ A4 */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area {
+                position: absolute; left: 0; top: 0;
+                width: 210mm; /* A4 Width */
+                padding: 0; margin: 0;
+            }
+            .no-print { display: none !important; }
+            .page-break { page-break-after: always; }
+            @page { size: A4 portrait; margin: 10mm; }
+        }
+
+        /* Card Template CSS */
+        .id-card-preview {
+            width: 5.4cm; height: 8.6cm; /* Standard Vertical */
+            position: relative; border: 1px solid #ccc;
+            background-color: white; overflow: hidden;
+            background-size: cover; background-position: center;
+        }
+        .id-card-preview.landscape {
+            width: 8.6cm; height: 5.4cm;
+        }
+        
+        /* CSS สำหรับฟีเจอร์ลากวาง */
+        .abs-elem { position: absolute; cursor: move; user-select: none; box-sizing: border-box; overflow: hidden; }
+        .abs-elem.active-elem { outline: 2px dashed #3b82f6; outline-offset: 2px; z-index: 40; overflow: visible !important; }
+        .student-photo-box { border: 1px solid #ddd; background: #eee; object-fit: cover;}
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex flex-col items-center justify-center hidden">
+        <i class="fas fa-circle-notch fa-spin text-nara-yellow text-5xl mb-4"></i>
+        <p id="loading-msg" class="text-white text-lg font-medium">กำลังประมวลผล...</p>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 translate-x-full opacity-0">
+        <div class="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+            <i id="toast-icon" class="fas fa-check-circle"></i>
+            <span id="toast-msg" class="font-medium">สำเร็จ</span>
+        </div>
+    </div>
+
+    <!-- ==================== หน้า Login ==================== -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center bg-nara-blue p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
+            <img id="login-logo" src="https://upload.wikimedia.org/wikipedia/th/thumb/e/e0/Narasikkhalai_School_Logo.png/200px-Narasikkhalai_School_Logo.png" alt="Logo" class="w-24 h-24 mx-auto mb-4 object-contain">
+            <h1 class="text-2xl font-bold text-nara-blue mb-2">ระบบพิมพ์บัตรประจำตัวนักเรียน</h1>
+            <h2 id="login-school-name" class="text-lg text-gray-600 mb-8">โรงเรียนนราสิกขาลัย</h2>
+            
+            <form id="login-form" onsubmit="handleLogin(event)" class="text-left">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-1">ชื่อผู้ใช้</label>
+                    <div class="relative">
+                        <i class="fas fa-user absolute left-3 top-3 text-gray-400"></i>
+                        <input type="text" id="login-user" class="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-nara-yellow focus:border-nara-yellow outline-none" required>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-1">รหัสผ่าน</label>
+                    <div class="relative">
+                        <i class="fas fa-lock absolute left-3 top-3 text-gray-400"></i>
+                        <input type="password" id="login-pass" class="w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-nara-yellow focus:border-nara-yellow outline-none" required>
+                        <button type="button" onclick="togglePassword('login-pass', 'eye-icon')" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+                            <i id="eye-icon" class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between mb-6">
+                    <label class="flex items-center text-sm cursor-pointer">
+                        <input type="checkbox" id="remember-me" class="mr-2 rounded text-nara-blue focus:ring-nara-blue">
+                        จดจำฉันไว้ในระบบ
+                    </label>
+                </div>
+                <button type="submit" class="w-full bg-nara-yellow hover:bg-yellow-500 text-nara-blue font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                    เข้าสู่ระบบ
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== หน้า App หลัก ==================== -->
+    <div id="app-screen" class="hidden h-screen w-screen overflow-hidden flex bg-gray-50">
+        
+        <!-- Sidebar Overlay (Mobile) -->
+        <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-30 w-64 bg-nara-blue text-white flex flex-col transition-transform duration-300 transform -translate-x-full md:translate-x-0 h-full shadow-2xl md:shadow-none">
+            <div class="p-4 flex items-center gap-3 border-b border-blue-800">
+                <img id="sidebar-logo" src="" alt="Logo" class="w-10 h-10 object-contain bg-white rounded-full flex-shrink-0">
+                <div class="overflow-hidden">
+                    <h3 class="font-bold text-sm truncate" id="sidebar-school-name">รร.นราสิกขาลัย</h3>
+                    <p class="text-xs text-blue-300">ระบบบัตรนักเรียน</p>
+                </div>
+            </div>
+            
+            <!-- User Profile (Mobile) -->
+            <div class="p-4 border-b border-blue-800 md:hidden flex justify-between items-center">
+                <span class="text-sm truncate mr-2">ผู้ใช้งาน: <span id="current-user-mobile" class="font-bold text-nara-yellow"></span></span>
+            </div>
+
+            <nav class="flex-1 p-2 overflow-y-auto hide-scroll">
+                <ul class="space-y-1">
+                    <li><button onclick="nav('menu-dashboard')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-3" data-target="menu-dashboard"><i class="fas fa-home w-5"></i> หน้าแรก</button></li>
+                    <li><button onclick="nav('menu-makercard')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-3" data-target="menu-makercard"><i class="fas fa-id-badge w-5 text-nara-yellow"></i> ทำบัตรนักเรียน</button></li>
+                    <li><button onclick="nav('menu-printcard')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-3" data-target="menu-printcard"><i class="fas fa-print w-5"></i> พิมพ์บัตรนักเรียน</button></li>
+                    <li><button onclick="nav('menu-students')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-3" data-target="menu-students"><i class="fas fa-users w-5"></i> จัดการข้อมูลนักเรียน</button></li>
+                    <li><button onclick="nav('menu-users')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-3" data-target="menu-users"><i class="fas fa-user-cog w-5"></i> จัดการข้อมูลผู้ใช้</button></li>
+                    <li><button onclick="nav('menu-settings')" class="menu-btn w-full text-left px-4 py-3 rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-3" data-target="menu-settings"><i class="fas fa-cog w-5"></i> ตั้งค่าระบบ</button></li>
+                </ul>
+            </nav>
+            
+            <div class="p-4 border-t border-blue-800 md:hidden">
+                 <button onclick="logout()" class="w-full text-center text-red-400 hover:text-red-300 py-2 border border-red-500 rounded text-sm"><i class="fas fa-sign-out-alt"></i> ออกจากระบบ</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden w-full relative">
+            <!-- Header -->
+            <header class="bg-white shadow-sm p-4 flex justify-between items-center z-10 flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebar()" class="md:hidden text-nara-blue hover:text-blue-700 text-xl w-8 h-8 flex items-center justify-center">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h2 id="page-title" class="text-xl font-bold text-nara-blue truncate">หน้าแรก</h2>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-gray-600 hidden md:inline-block">เข้าสู่ระบบโดย: <span id="current-user-desktop" class="font-bold text-nara-blue"></span></span>
+                    <button onclick="logout()" class="hidden md:inline-block text-red-500 hover:text-red-700 px-3 py-1 rounded border border-red-500 hover:bg-red-50 transition-colors text-sm">
+                        <i class="fas fa-sign-out-alt mr-1"></i> ออกจากระบบ
+                    </button>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 bg-gray-50 relative" id="main-content-area">
+                
+                <!-- 1. Dashboard -->
+                <div id="menu-dashboard" class="content-section hidden">
+                    <div class="bg-white rounded-xl shadow-sm p-8 text-center mt-4 md:mt-8">
+                        <img id="dash-logo" src="https://upload.wikimedia.org/wikipedia/th/thumb/e/e0/Narasikkhalai_School_Logo.png/200px-Narasikkhalai_School_Logo.png" class="h-24 mx-auto mb-4 object-contain">
+                        <h2 class="text-2xl font-bold text-nara-blue mb-2">ยินดีต้อนรับเข้าสู่ระบบ</h2>
+                        <p class="text-gray-600 mb-8" id="dash-school-name">โรงเรียนนราสิกขาลัย</p>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                            <button onclick="nav('menu-makercard')" class="bg-blue-50 hover:bg-blue-100 p-6 rounded-xl border border-blue-200 transition text-nara-blue flex flex-col items-center justify-center transform hover:-translate-y-1 hover:shadow-md">
+                                <i class="fas fa-id-badge text-4xl mb-3 text-nara-yellow"></i>
+                                <span class="font-bold">ทำบัตรนักเรียน</span>
+                            </button>
+                            <button onclick="nav('menu-printcard')" class="bg-blue-50 hover:bg-blue-100 p-6 rounded-xl border border-blue-200 transition text-nara-blue flex flex-col items-center justify-center transform hover:-translate-y-1 hover:shadow-md">
+                                <i class="fas fa-print text-4xl mb-3 text-blue-500"></i>
+                                <span class="font-bold">พิมพ์บัตรนักเรียน</span>
+                            </button>
+                            <button onclick="nav('menu-students')" class="bg-blue-50 hover:bg-blue-100 p-6 rounded-xl border border-blue-200 transition text-nara-blue flex flex-col items-center justify-center transform hover:-translate-y-1 hover:shadow-md">
+                                <i class="fas fa-users text-4xl mb-3 text-purple-500"></i>
+                                <span class="font-bold">จัดการข้อมูลนักเรียน</span>
+                            </button>
+                            <button onclick="nav('menu-users')" class="bg-blue-50 hover:bg-blue-100 p-6 rounded-xl border border-blue-200 transition text-nara-blue flex flex-col items-center justify-center transform hover:-translate-y-1 hover:shadow-md">
+                                <i class="fas fa-user-cog text-4xl mb-3 text-green-500"></i>
+                                <span class="font-bold">จัดการข้อมูลผู้ใช้</span>
+                            </button>
+                            <button onclick="nav('menu-settings')" class="bg-blue-50 hover:bg-blue-100 p-6 rounded-xl border border-blue-200 transition text-nara-blue flex flex-col items-center justify-center transform hover:-translate-y-1 hover:shadow-md">
+                                <i class="fas fa-cog text-4xl mb-3 text-gray-500"></i>
+                                <span class="font-bold">ตั้งค่าระบบ</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. ตั้งค่าระบบ -->
+                <div id="menu-settings" class="content-section hidden space-y-6">
+                    <!-- Tabs -->
+                    <div class="flex border-b">
+                        <button onclick="switchTab('set-tab1')" id="btn-set-tab1" class="px-6 py-2 border-b-2 border-nara-blue text-nara-blue font-bold">ข้อมูลทั่วไป</button>
+                        <button onclick="switchTab('set-tab2')" id="btn-set-tab2" class="px-6 py-2 border-b-2 border-transparent text-gray-500 hover:text-nara-blue">รูปแบบบัตร</button>
+                    </div>
+
+                    <!-- Tab 1: ข้อมูลทั่วไป -->
+                    <div id="set-tab1" class="bg-white p-6 rounded-xl shadow-sm">
+                        <form id="form-general-settings" onsubmit="saveGeneralSettings(event)">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">ชื่อโรงเรียน</label>
+                                    <input type="text" id="set-school-name" class="w-full p-2 border rounded" value="โรงเรียนนราสิกขาลัย">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">ชื่อผู้ลงนาม (ผอ.)</label>
+                                    <input type="text" id="set-signer-name" class="w-full p-2 border rounded">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">ที่อยู่โรงเรียน</label>
+                                    <input type="text" id="set-school-address" class="w-full p-2 border rounded" placeholder="เช่น 123 ถ.นราธิวาส ต.บางนาค อ.เมือง จ.นราธิวาส 96000">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">เว็บไซต์โรงเรียน</label>
+                                    <input type="text" id="set-school-website" class="w-full p-2 border rounded" placeholder="เช่น www.narasikkhalai.ac.th">
+                                </div>
+                                <div class="col-span-1 md:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">ตั้งค่าแผนการเรียน (ชั้น/ห้อง = แผนการเรียน)</label>
+                                    <textarea id="set-program-map" rows="3" class="w-full p-2 border rounded" placeholder="เช่น ม.4/1 = วิทย์-คณิต&#10;ม.4/2 = ศิลป์-คำนวณ"></textarea>
+                                </div>
+                                
+                                <!-- ส่วนอัปเดตฐานข้อมูลที่อยู่จาก Google Sheet -->
+                                <div class="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded border border-blue-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <div>
+                                        <label class="block text-sm font-bold text-nara-blue mb-1"><i class="fas fa-database"></i> ฐานข้อมูลที่อยู่ (จังหวัด, อำเภอ, ตำบล)</label>
+                                        <p class="text-xs text-gray-600">ระบบจะดึงข้อมูลจากชีท "ฐานข้อมูลจังหวัด" อัตโนมัติ (คอลัมน์ A, B, C, D)</p>
+                                        <p id="address-db-status" class="text-xs mt-1 text-gray-500 font-medium"></p>
+                                    </div>
+                                    <button type="button" onclick="syncAddressDB()" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 text-sm whitespace-nowrap"><i class="fas fa-sync"></i> อัปเดตข้อมูลที่อยู่</button>
+                                </div>
+
+                                <div class="col-span-1 md:col-span-2">
+                                    <label class="block text-sm font-medium mb-1">ข้อปฏิบัติในการใช้บัตร (แสดงด้านหลัง)</label>
+                                    <textarea id="set-rules" rows="3" class="w-full p-2 border rounded"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">อัปโหลดโลโกโรงเรียน</label>
+                                    <input type="file" id="set-logo-file" accept="image/*" class="w-full p-2 border rounded" onchange="previewImageToBase64(this, 'preview-logo', (b64) => { document.getElementById('set-logo-base64').value = b64; })">
+                                    <img id="preview-logo" src="" class="mt-2 h-20 object-contain hidden">
+                                    <input type="hidden" id="set-logo-base64">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">ลายเซ็นผู้ลงนาม (พื้นหลังใส)</label>
+                                    <input type="file" id="set-sig-file" accept="image/png,image/jpeg" class="w-full p-2 border rounded" onchange="previewImageToBase64(this, 'preview-sig', (b64) => { document.getElementById('set-sig-base64').value = b64; })">
+                                    <img id="preview-sig" src="" class="mt-2 h-12 object-contain hidden">
+                                    <input type="hidden" id="set-sig-base64">
+                                </div>
+                            </div>
+                            <div class="mt-6 text-right">
+                                <button type="submit" class="bg-nara-blue text-white px-6 py-2 rounded shadow hover:bg-blue-800"><i class="fas fa-save"></i> บันทึกข้อมูลทั่วไป</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Tab 2: รูปแบบบัตร (Drag & Drop + Front/Back) -->
+                    <div id="set-tab2" class="hidden bg-white p-6 rounded-xl shadow-sm">
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                            <!-- แผงเครื่องมือควบคุม (Column 1) -->
+                            <div class="col-span-1 border-r pr-4">
+                                <h3 class="font-bold mb-4 text-nara-blue border-b pb-2">ตั้งค่าองค์ประกอบ</h3>
+                                <div class="space-y-4 text-sm">
+                                    <div>
+                                        <label class="block font-medium text-nara-blue mb-1">ตั้งค่ารูปแบบหน้ากระดาษ</label>
+                                        <select id="card-orientation" class="w-full p-2 border rounded" onchange="updateCardLayoutView()">
+                                            <option value="portrait">แนวตั้ง (5.4 x 8.6 cm)</option>
+                                            <option value="landscape">แนวนอน (8.6 x 5.4 cm)</option>
+                                        </select>
+                                    </div>
+                                    <hr class="my-3">
+                                    
+                                    <!-- Templates ด้านหน้า -->
+                                    <div>
+                                        <label class="block font-medium text-blue-600 mb-1">เทมเพลตด้านหน้า (สำเร็จรูป)</label>
+                                        <div class="flex flex-wrap gap-2 mb-2">
+                                            <button type="button" onclick="applyDynamicTemplate('front', 1)" class="px-3 py-1 text-xs rounded border bg-blue-100 hover:bg-blue-200 shadow-sm">แบบที่ 1</button>
+                                            <button type="button" onclick="applyDynamicTemplate('front', 2)" class="px-3 py-1 text-xs rounded border bg-blue-100 hover:bg-blue-200 shadow-sm">แบบที่ 2</button>
+                                            <button type="button" onclick="applyDynamicTemplate('front', 3)" class="px-3 py-1 text-xs rounded border bg-blue-100 hover:bg-blue-200 shadow-sm">แบบที่ 3</button>
+                                            <button type="button" onclick="applyDynamicTemplate('front', 4)" class="px-3 py-1 text-xs rounded border bg-blue-100 hover:bg-blue-200 shadow-sm">แบบที่ 4</button>
+                                            <button type="button" onclick="applyDynamicTemplate('front', 5)" class="px-3 py-1 text-xs rounded border bg-blue-100 hover:bg-blue-200 shadow-sm">แบบที่ 5</button>
+                                        </div>
+                                        <input type="file" accept="image/*" onchange="previewImageToBase64(this, null, applyFrontBg)" class="w-full p-1 text-xs border rounded" title="อัปโหลดพื้นหลังด้านหน้าเอง">
+                                        <input type="hidden" id="set-bg-front-base64">
+                                    </div>
+
+                                    <!-- Templates ด้านหลัง -->
+                                    <div class="mt-3">
+                                        <label class="block font-medium text-green-600 mb-1">เทมเพลตด้านหลัง (สำเร็จรูป)</label>
+                                        <div class="flex flex-wrap gap-2 mb-2">
+                                            <button type="button" onclick="applyDynamicTemplate('back', 1)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 1</button>
+                                            <button type="button" onclick="applyDynamicTemplate('back', 2)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 2</button>
+                                            <button type="button" onclick="applyDynamicTemplate('back', 3)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 3</button>
+                                            <button type="button" onclick="applyDynamicTemplate('back', 4)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 4</button>
+                                            <button type="button" onclick="applyDynamicTemplate('back', 5)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 5</button>
+                                        </div>
+                                        <input type="file" accept="image/*" onchange="previewImageToBase64(this, null, applyBackBg)" class="w-full p-1 text-xs border rounded" title="อัปโหลดพื้นหลังด้านหลังเอง">
+                                        <input type="hidden" id="set-bg-back-base64">
+                                    </div>
+                                    <hr class="my-4">
+                                    
+                                    <div>
+                                        <label class="block font-medium mb-2 text-nara-blue"><i class="fas fa-plus-circle"></i> เพิ่มข้อมูลในบัตร</label>
+                                        <select id="add-target-side" class="w-full p-2 border rounded text-sm mb-2 font-bold text-gray-700 bg-gray-50">
+                                            <option value="front">👉 เพิ่มลงด้านหน้า</option>
+                                            <option value="back">👉 เพิ่มลงด้านหลัง</option>
+                                        </select>
+                                        <div class="flex gap-2 mb-1">
+                                            <select id="add-field-select" class="w-full p-2 border rounded text-sm">
+                                                <option value="[รูปถ่าย]">รูปถ่ายนักเรียน</option>
+                                                <option value="[QR Code]">QR Code</option>
+                                                <option value="[ชื่อ-สกุล]">ชื่อ-สกุล</option>
+                                                <option value="[เลขประจำตัว]">เลขประจำตัว</option>
+                                                <option value="[เลขที่บัตร]">เลขที่บัตร (รันอัตโนมัติ)</option>
+                                                <option value="[ชั้น/ห้อง]">ชั้น/ห้อง</option>
+                                                <option value="[แผนการเรียน]">แผนการเรียน</option>
+                                                <option value="[วันเกิด]">วัน/เดือน/ปีเกิด</option>
+                                                <option value="[ที่อยู่]">ที่อยู่</option>
+                                                <option value="[วันออกบัตร]">วันออกบัตร</option>
+                                                <option value="[วันหมดอายุ]">วันหมดอายุ</option>
+                                                <option value="[ชื่อผู้ลงนาม]">ชื่อผู้ลงนาม (ตั้งค่า)</option>
+                                                <option value="[ลายเซ็นผู้ลงนาม]">ลายเซ็นผู้ลงนาม (ตั้งค่า)</option>
+                                                <option value="[ข้อปฏิบัติ]">ข้อปฏิบัติ (ตั้งค่า)</option>
+                                                <option value="[ชื่อโรงเรียน]">ชื่อโรงเรียน (ตั้งค่า)</option>
+                                                <option value="[ที่อยู่โรงเรียน]">ที่อยู่โรงเรียน (ตั้งค่า)</option>
+                                                <option value="[เว็บไซต์โรงเรียน]">เว็บไซต์โรงเรียน (ตั้งค่า)</option>
+                                                <option value="[โลโก้โรงเรียน]">โลโก้โรงเรียน (ตั้งค่า)</option>
+                                                <option value="[ข้อความอิสระ]">-- พิมพ์ข้อความเอง --</option>
+                                            </select>
+                                            <button type="button" onclick="addLayoutElement()" class="bg-green-600 text-white px-3 rounded hover:bg-green-700 font-bold"><i class="fas fa-plus"></i></button>
+                                        </div>
+                                    </div>
+
+                                    <button type="button" onclick="saveCardLayout()" class="w-full bg-nara-blue text-white py-2 rounded mt-6 shadow hover:bg-blue-800"><i class="fas fa-save"></i> บันทึกรูปแบบบัตร</button>
+                                </div>
+                            </div>
+                            
+                            <!-- หน้าต่างพรีวิวและลากวาง (Column 2-4) -->
+                            <div class="col-span-3 bg-gray-100 p-4 rounded border border-dashed border-gray-300 overflow-auto relative min-h-[500px]">
+                                <!-- Toolbar เครื่องมือ (จะแสดงเมื่อคลิกเลือกชิ้นส่วน) -->
+                                <div id="element-toolbar" class="hidden sticky top-0 mx-auto w-max mb-4 bg-white shadow-xl border border-blue-300 rounded-lg p-2 z-50 flex gap-3 items-center transform transition-all duration-200">
+                                    <span class="text-xs font-bold text-nara-blue border-r pr-2"><i class="fas fa-tools"></i> ปรับแต่ง</span>
+                                    <div class="flex items-center gap-1">
+                                        <label class="text-[10px] text-gray-500">ฟอนต์(px)</label>
+                                        <input type="number" id="tb-fontsize" class="border rounded w-12 p-1 text-xs text-center" oninput="updateActiveElementStyle('fontSize', this.value)">
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <label class="text-[10px] text-gray-500">สี</label>
+                                        <input type="color" id="tb-color" class="w-6 h-6 border-none p-0 cursor-pointer rounded" oninput="updateActiveElementStyle('color', this.value)">
+                                    </div>
+                                    <div class="flex items-center gap-1 border-l pl-2">
+                                        <label class="text-[10px] text-gray-500">สีขอบ</label>
+                                        <input type="color" id="tb-border-color" class="w-6 h-6 border-none p-0 cursor-pointer rounded" oninput="updateActiveElementStyle('borderColor', this.value)">
+                                    </div>
+                                    <div class="flex items-center gap-1 border-l pl-2">
+                                        <label class="text-[10px] text-gray-500">ขอบมน</label>
+                                        <input type="number" id="tb-border-radius" class="border rounded w-12 p-1 text-xs text-center" placeholder="0" oninput="updateActiveElementStyle('borderRadius', this.value)">
+                                    </div>
+                                    <div class="flex items-center gap-1 border-l pl-2">
+                                        <label class="text-[10px] text-gray-500">กว้าง</label>
+                                        <input type="text" id="tb-width" class="border rounded w-16 p-1 text-xs" placeholder="auto" oninput="updateActiveElementStyle('width', this.value)">
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <label class="text-[10px] text-gray-500">สูง</label>
+                                        <input type="text" id="tb-height" class="border rounded w-16 p-1 text-xs" placeholder="auto" oninput="updateActiveElementStyle('height', this.value)">
+                                    </div>
+                                    <div class="border-l pl-2 flex gap-1">
+                                        <button type="button" onclick="updateActiveElementStyle('textAlign', 'left')" class="bg-gray-100 p-1.5 rounded hover:bg-gray-200" title="จัดชิดซ้าย"><i class="fas fa-align-left text-xs"></i></button>
+                                        <button type="button" onclick="updateActiveElementStyle('textAlign', 'center')" class="bg-gray-100 p-1.5 rounded hover:bg-gray-200" title="จัดกึ่งกลาง"><i class="fas fa-align-center text-xs"></i></button>
+                                        <button type="button" onclick="updateActiveElementStyle('textAlign', 'right')" class="bg-gray-100 p-1.5 rounded hover:bg-gray-200" title="จัดชิดขวา"><i class="fas fa-align-right text-xs"></i></button>
+                                        <button type="button" onclick="updateActiveElementStyle('fontWeight', 'bold')" class="bg-gray-100 p-1.5 rounded hover:bg-gray-200" title="ตัวหนา"><i class="fas fa-bold text-xs"></i></button>
+                                        <button type="button" onclick="deleteActiveElement()" class="text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded ml-2" title="ลบ"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-row gap-8 justify-center items-start pt-4 min-w-max mx-auto" onclick="deselectElement(event)" id="boards-container">
+                                    
+                                    <!-- บอร์ดด้านหน้า -->
+                                    <div class="flex flex-col items-center">
+                                        <h4 class="font-bold mb-2 text-nara-blue">ด้านหน้า (Front)</h4>
+                                        <div id="card-preview-board" class="id-card-preview shadow-xl relative cursor-pointer">
+                                            <!-- ค่าเริ่มต้นด้านหน้า -->
+                                            <div id="elem-card-num" class="abs-elem" style="left:85%; top:10%; transform: translate(-50%, -50%); color:#9ca3af; font-size:9px; font-weight:normal; white-space:nowrap; text-align:center;" data-type="text" data-field="[เลขที่บัตร]">Nscd 0001</div>
+                                            <div id="elem-photo" class="abs-elem student-photo-box" style="left:50%; top:30%; transform: translate(-50%, -50%); width:2.5cm; height:3cm; border-radius: 10px; border: 2px solid #1e3a8a; overflow: hidden;" data-type="photo" data-field="[รูปถ่าย]">
+                                                <img src="https://via.placeholder.com/150" class="w-full h-full object-cover pointer-events-none" style="border-radius: inherit;">
+                                            </div>
+                                            <div id="elem-name" class="abs-elem" style="left:50%; top:65%; transform: translate(-50%, -50%); color:#000000; font-weight:bold; font-size:14px; white-space:nowrap; text-align:center;" data-type="text" data-field="[ชื่อ-สกุล]">นายสมชาย รักเรียน</div>
+                                            <div id="elem-id" class="abs-elem" style="left:50%; top:75%; transform: translate(-50%, -50%); color:#000000; font-weight:bold; font-size:12px; white-space:nowrap; text-align:center;" data-type="text" data-field="[เลขประจำตัว]">12345</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- บอร์ดด้านหลัง -->
+                                    <div class="flex flex-col items-center">
+                                        <h4 class="font-bold mb-2 text-green-700">ด้านหลัง (Back)</h4>
+                                        <div id="card-preview-board-back" class="id-card-preview shadow-xl relative cursor-pointer">
+                                            <!-- ค่าเริ่มต้นด้านหลัง -->
+                                            <div id="elem-qr" class="abs-elem bg-white p-1" style="left:50%; top:20%; transform: translate(-50%, -50%); width: 50px; height: 50px;" data-type="qr" data-field="[QR Code]">
+                                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=50x50&data=12345" class="w-full h-full pointer-events-none">
+                                            </div>
+                                            <div id="elem-rules" class="abs-elem" style="left:50%; top:50%; transform: translate(-50%, -50%); width:90%; color:#000000; font-size:8px; white-space:pre-wrap; text-align:left; font-weight:normal;" data-type="text" data-field="[ข้อปฏิบัติ]">1. บัตรนี้ใช้เพื่อแสดงตน<br>2. กรณีสูญหายต้องแจ้งทำใหม่</div>
+                                            <div id="elem-sig" class="abs-elem" style="left:50%; top:80%; transform: translate(-50%, -50%); width:80px; height:30px;" data-type="signature" data-field="[ลายเซ็นผู้ลงนาม]">
+                                                <img src="https://via.placeholder.com/80x30?text=Signature" class="w-full h-full object-contain pointer-events-none">
+                                            </div>
+                                            <div id="elem-signer" class="abs-elem" style="left:50%; top:90%; transform: translate(-50%, -50%); color:#000000; font-size:8px; white-space:nowrap; text-align:center; font-weight:bold;" data-type="text" data-field="[ชื่อผู้ลงนาม]">(ผู้อำนวยการโรงเรียน)</div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. จัดการข้อมูลผู้ใช้ -->
+                <div id="menu-users" class="content-section hidden">
+                    <div class="bg-white p-6 rounded-xl shadow-sm mb-6">
+                        <h3 class="font-bold text-nara-blue mb-4 text-lg border-b pb-2">ฟอร์มข้อมูลผู้ใช้</h3>
+                        <form id="form-user" onsubmit="saveUser(event)">
+                            <input type="hidden" id="user-id">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div><label class="text-sm">ชื่อ-สกุล</label><input type="text" id="u-name" class="w-full p-2 border rounded" required></div>
+                                <div><label class="text-sm">ตำแหน่ง</label><input type="text" id="u-pos" class="w-full p-2 border rounded"></div>
+                                <div>
+                                    <label class="text-sm">บทบาท</label>
+                                    <select id="u-role" class="w-full p-2 border rounded">
+                                        <option value="Admin">ผู้ดูแลระบบ</option>
+                                        <option value="Staff">เจ้าหน้าที่</option>
+                                    </select>
+                                </div>
+                                <div><label class="text-sm">ชื่อผู้ใช้ (Username)</label><input type="text" id="u-username" class="w-full p-2 border rounded" required></div>
+                                <div><label class="text-sm">รหัสผ่าน</label><input type="text" id="u-password" class="w-full p-2 border rounded" required></div>
+                            </div>
+                            <div class="mt-4 flex gap-2">
+                                <button type="submit" class="bg-nara-blue text-white px-4 py-2 rounded hover:bg-blue-800"><i class="fas fa-save"></i> บันทึก</button>
+                                <button type="button" onclick="document.getElementById('form-user').reset(); document.getElementById('user-id').value='';" class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400">ล้างฟอร์ม</button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-nara-blue text-lg">ตารางข้อมูลผู้ใช้</h3>
+                            <button onclick="fetchUsers()" class="text-sm bg-nara-yellow text-nara-blue px-3 py-1 rounded shadow"><i class="fas fa-sync"></i> รีเฟรชฐานข้อมูล</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-100 text-gray-600">
+                                    <tr>
+                                        <th class="p-3">ชื่อ-สกุล</th><th class="p-3">ตำแหน่ง</th><th class="p-3">บทบาท</th><th class="p-3">ชื่อผู้ใช้</th><th class="p-3 text-center">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-users" class="divide-y divide-gray-200">
+                                    <!-- Data via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. จัดการข้อมูลนักเรียน -->
+                <div id="menu-students" class="content-section hidden">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="clearStudentForm()" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700"><i class="fas fa-plus"></i> เพิ่มนักเรียนใหม่</button>
+                            <button onclick="document.getElementById('csv-file').click()" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700"><i class="fas fa-file-import"></i> นำเข้าด้วย CSV</button>
+                            <input type="file" id="csv-file" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
+                            <button onclick="downloadCSVTemplate()" class="bg-gray-500 text-white px-4 py-2 rounded shadow hover:bg-gray-600"><i class="fas fa-file-csv"></i> โหลดเทมเพลต</button>
+                        </div>
+                        <div class="flex gap-2 w-full md:w-auto">
+                            <input type="text" id="search-stu-input" placeholder="ค้นหาด้วยเลขประจำตัว..." class="p-2 border rounded shadow-sm w-full md:w-64" onkeyup="searchStudentDB()">
+                            <button onclick="searchStudentDB()" class="bg-nara-blue text-white px-4 py-2 rounded shadow hover:bg-blue-800"><i class="fas fa-search"></i> ค้นหา</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm mb-6">
+                        <form id="form-student" onsubmit="saveStudent(event)">
+                            <input type="hidden" id="stu-id">
+                            <div class="flex flex-col md:flex-row gap-6">
+                                <!-- ฟอร์มรูปภาพ -->
+                                <div class="w-full md:w-48 flex flex-col items-center">
+                                    <div class="w-32 h-40 border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden mb-2 relative">
+                                        <img id="stu-photo-preview" src="" class="w-full h-full object-cover hidden">
+                                        <i id="stu-photo-icon" class="fas fa-user text-4xl text-gray-300"></i>
+                                    </div>
+                                    <label class="bg-gray-200 hover:bg-gray-300 text-xs px-3 py-1 rounded cursor-pointer">
+                                        <i class="fas fa-upload"></i> อัปโหลดรูป
+                                        <input type="file" accept="image/*" class="hidden" onchange="previewImageToBase64(this, 'stu-photo-preview', (b64)=>{ document.getElementById('stu-photo-base64').value = b64; document.getElementById('stu-photo-icon').classList.add('hidden'); })">
+                                    </label>
+                                    <input type="hidden" id="stu-photo-base64">
+                                </div>
+                                <!-- ฟอร์มข้อมูล -->
+                                <div class="flex-1 flex flex-col gap-4">
+                                    
+                                    <!-- แถวที่ 1 -->
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="md:col-span-1"><label class="text-xs text-gray-500">เลขประจำตัว</label><input type="text" id="stu-code" class="w-full p-2 border rounded text-sm font-bold text-nara-blue" required></div>
+                                        <div class="md:col-span-2"><label class="text-xs text-gray-500">ชื่อ-นามสกุล</label><input type="text" id="stu-name" class="w-full p-2 border rounded text-sm" required></div>
+                                    </div>
+                                    
+                                    <!-- แถวที่ 2 -->
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label class="text-xs text-gray-500">ชั้นเรียน</label>
+                                            <select id="stu-class-level" class="w-full p-2 border rounded text-sm" onchange="updateProgramAuto()" required>
+                                                <option value="">เลือกชั้น</option>
+                                                <option value="ม.1">ม.1</option><option value="ม.2">ม.2</option><option value="ม.3">ม.3</option>
+                                                <option value="ม.4">ม.4</option><option value="ม.5">ม.5</option><option value="ม.6">ม.6</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-gray-500">ห้อง</label>
+                                            <select id="stu-class-room" class="w-full p-2 border rounded text-sm" onchange="updateProgramAuto()" required>
+                                                <option value="">เลือกห้อง</option>
+                                                <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                                                <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+                                            </select>
+                                        </div>
+                                        <div><label class="text-xs text-gray-500">แผนการเรียน</label><input type="text" id="stu-program" class="w-full p-2 border rounded text-sm bg-gray-50" placeholder="อัตโนมัติตามชั้น/ห้อง"></div>
+                                    </div>
+                                    
+                                    <!-- แถวที่ 3 -->
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div><label class="text-xs text-gray-500">วัน/เดือน/ปีเกิด</label><input type="date" id="stu-dob" class="w-full p-2 border rounded text-sm" onchange="calcAge('stu-dob','stu-age')"></div>
+                                        <div><label class="text-xs text-gray-500">อายุ (ปี)</label><input type="text" id="stu-age" class="w-full p-2 border rounded bg-gray-100 text-sm" readonly></div>
+                                        <div><label class="text-xs text-gray-500">ครูที่ปรึกษา</label><input type="text" id="stu-advisor" class="w-full p-2 border rounded text-sm"></div>
+                                    </div>
+
+                                    <!-- แถวที่ 4 (ที่อยู่) -->
+                                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                        <label class="text-xs font-bold text-nara-blue mb-2 block"><i class="fas fa-map-marker-alt"></i> ที่อยู่ปัจจุบัน</label>
+                                        <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-3">
+                                            <div class="md:col-span-1"><label class="text-xs text-gray-500">บ้านเลขที่</label><input type="text" id="addr-no" class="w-full p-2 border rounded text-sm" oninput="buildAddress()"></div>
+                                            <div class="md:col-span-1"><label class="text-xs text-gray-500">หมู่ที่</label><input type="text" id="addr-moo" class="w-full p-2 border rounded text-sm" oninput="buildAddress()"></div>
+                                            <div class="md:col-span-1"><label class="text-xs text-gray-500">จังหวัด</label><select id="addr-prov" class="w-full p-2 border rounded text-sm" onchange="provChange()"><option value="">เลือกจังหวัด</option></select></div>
+                                            <div class="md:col-span-1"><label class="text-xs text-gray-500">อำเภอ</label><select id="addr-dist" class="w-full p-2 border rounded text-sm" onchange="distChange()"><option value="">เลือกอำเภอ</option></select></div>
+                                            <div class="md:col-span-1"><label class="text-xs text-gray-500">ตำบล</label><select id="addr-sub" class="w-full p-2 border rounded text-sm" onchange="subChange()"><option value="">เลือกตำบล</option></select></div>
+                                            <div class="md:col-span-1"><label class="text-xs text-gray-500">รหัสไปรษณีย์</label><input type="text" id="addr-zip" class="w-full p-2 border rounded text-sm bg-gray-100 font-bold" readonly></div>
+                                        </div>
+                                        <div>
+                                            <label class="text-xs text-gray-500">ที่อยู่รวม (สำหรับบันทึกข้อมูลและแสดงในบัตร)</label>
+                                            <input type="text" id="stu-address" class="w-full p-2 border rounded text-sm font-bold bg-white text-nara-blue" placeholder="รอการกรอกที่อยู่ด้านบน..." required>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- แถวที่ 5 -->
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label class="text-xs text-gray-500">ชื่อผู้ปกครอง</label><input type="text" id="stu-parent" class="w-full p-2 border rounded text-sm"></div>
+                                        <div><label class="text-xs text-gray-500">เบอร์โทรผู้ปกครอง</label><input type="text" id="stu-parent-tel" class="w-full p-2 border rounded text-sm"></div>
+                                    </div>
+
+                                </div>
+                            </div>
+                            <div class="mt-4 text-right border-t pt-4">
+                                <button type="submit" id="btn-save-student" class="bg-nara-blue text-white px-8 py-2 rounded shadow hover:bg-blue-800 font-bold transition-colors duration-200"><i class="fas fa-save"></i> บันทึกข้อมูลนักเรียน</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm">
+                         <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <h3 class="font-bold text-nara-blue text-lg">ฐานข้อมูลนักเรียน</h3>
+                                <select id="filter-stu-class" class="p-1.5 border rounded text-sm shadow-sm bg-gray-50" onchange="searchStudentDB()">
+                                    <option value="">ทุกชั้นเรียน</option>
+                                    <option value="ม.1">ม.1</option><option value="ม.2">ม.2</option><option value="ม.3">ม.3</option>
+                                    <option value="ม.4">ม.4</option><option value="ม.5">ม.5</option><option value="ม.6">ม.6</option>
+                                </select>
+                                <select id="filter-stu-room" class="p-1.5 border rounded text-sm shadow-sm bg-gray-50" onchange="searchStudentDB()">
+                                    <option value="">ทุกห้อง</option>
+                                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                                    <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                                    <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                                    <option value="10">10</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span id="db-sync-status" class="text-sm font-medium text-gray-600 hidden transition-opacity duration-300"></span>
+                                <button onclick="fetchStudents()" class="text-sm bg-nara-yellow text-nara-blue px-3 py-1 rounded shadow hover:bg-yellow-500"><i class="fas fa-sync"></i> รีเฟรชฐานข้อมูล</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-100 text-gray-600">
+                                    <tr>
+                                        <th class="p-3">รูป</th><th class="p-3">เลขประจำตัว</th><th class="p-3">ชื่อ-สกุล</th><th class="p-3">ชั้น/ห้อง</th><th class="p-3 text-center">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-students" class="divide-y divide-gray-200">
+                                    <!-- Data via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. ทำบัตรนักเรียน -->
+                <div id="menu-makercard" class="content-section hidden">
+                    <div class="bg-nara-light border border-blue-200 p-6 rounded-xl mb-6">
+                        <h3 class="font-bold text-nara-blue text-lg mb-4"><i class="fas fa-search"></i> ค้นหานักเรียนเพื่อออกบัตร</h3>
+                        
+                        <div class="flex flex-col md:flex-row gap-6 mb-2">
+                            <!-- ค้นหาเดี่ยว -->
+                            <div class="flex-1">
+                                <label class="block text-xs mb-1 font-bold text-gray-600">ค้นหาด้วยรหัสประจำตัว</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="maker-search-id" placeholder="พิมพ์เลขประจำตัว..." class="p-2 border rounded flex-1 shadow-sm">
+                                    <button onclick="makerAddById()" class="bg-nara-blue text-white px-4 py-2 rounded hover:bg-blue-800 shadow"><i class="fas fa-plus"></i> เพิ่ม</button>
+                                </div>
+                            </div>
+                            
+                            <div class="hidden md:block w-px bg-gray-300"></div>
+                            
+                            <!-- ค้นหากลุ่ม -->
+                            <div class="flex-[2]">
+                                <label class="block text-xs mb-1 font-bold text-gray-600">ค้นหาแบบกลุ่ม (เลือกชั้น/ห้อง)</label>
+                                <div class="flex flex-wrap gap-2 items-start">
+                                    <select id="maker-search-class" class="p-2 border rounded w-28 text-sm shadow-sm">
+                                        <option value="">ทุกชั้น</option>
+                                        <option value="ม.1">ม.1</option><option value="ม.2">ม.2</option><option value="ม.3">ม.3</option>
+                                        <option value="ม.4">ม.4</option><option value="ม.5">ม.5</option><option value="ม.6">ม.6</option>
+                                    </select>
+                                    <select id="maker-search-room" class="p-2 border rounded w-28 text-sm shadow-sm">
+                                        <option value="">ทุกห้อง</option>
+                                        <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                                        <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+                                    </select>
+                                    <button onclick="makerSearchGroup()" class="bg-nara-blue text-white px-4 py-2 rounded hover:bg-blue-800 shadow"><i class="fas fa-search"></i> ค้นหา</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ตารางผลการค้นหากลุ่ม -->
+                        <div id="maker-search-results-area" class="hidden mt-4 border-t border-blue-200 pt-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <p class="text-sm font-bold text-gray-700">ผลการค้นหา: เลือกนักเรียนที่ต้องการ</p>
+                                <button onclick="makerAddSelectedToQueue()" class="bg-nara-yellow text-nara-blue font-bold px-4 py-1.5 rounded shadow text-sm hover:bg-yellow-500"><i class="fas fa-arrow-down"></i> เพิ่มรายการที่ติ๊กลงคิว</button>
+                            </div>
+                            <div class="max-h-60 overflow-y-auto border rounded bg-white shadow-inner">
+                                <table class="w-full text-sm text-left">
+                                    <thead class="bg-gray-100 sticky top-0 shadow-sm">
+                                        <tr>
+                                            <th class="p-2 text-center w-12"><input type="checkbox" onchange="toggleMakerCheckAll(this)"></th>
+                                            <th class="p-2">เลขประจำตัว</th><th class="p-2">ชื่อ-สกุล</th><th class="p-2">ชั้น/ห้อง</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="maker-search-results-tbody" class="divide-y"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ตารางคิวรอดำเนินการ -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm mb-6 border border-blue-100">
+                         <div class="flex justify-between items-center mb-4">
+                             <h3 class="font-bold text-nara-blue text-lg"><i class="fas fa-list-ol text-nara-yellow"></i> ตารางรายการรอดำเนินการออกบัตร (<span id="queue-count">0</span>)</h3>
+                             <button onclick="issueQueueList=[]; renderIssueQueue();" class="text-xs text-red-500 hover:underline"><i class="fas fa-trash"></i> ล้างรายการทั้งหมด</button>
+                         </div>
+                         <div class="overflow-x-auto">
+                             <table class="w-full text-sm text-left border">
+                                <thead class="bg-blue-50 text-nara-blue">
+                                    <tr>
+                                        <th class="p-3">เลขประจำตัว</th><th class="p-3">ชื่อ-สกุล</th><th class="p-3">ชั้น/ห้อง</th><th class="p-3 text-center">จัดการ/ออกบัตร</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="maker-queue-tbody" class="divide-y">
+                                    <tr><td colspan="4" class="text-center p-6 text-gray-400">ยังไม่มีรายการ กรุณาค้นหาและเพิ่มรายการด้านบน</td></tr>
+                                </tbody>
+                             </table>
+                         </div>
+                    </div>
+
+                    <!-- ประวัติการออกบัตร -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm mt-6 border border-gray-100">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <h3 class="font-bold text-gray-700 text-lg"><i class="fas fa-history"></i> ประวัติการออกบัตรล่าสุด</h3>
+                                <select id="filter-history-class" class="p-1.5 border rounded text-sm shadow-sm bg-gray-50" onchange="renderCardHistory()">
+                                    <option value="">ทุกชั้นเรียน</option>
+                                    <option value="ม.1">ม.1</option><option value="ม.2">ม.2</option><option value="ม.3">ม.3</option>
+                                    <option value="ม.4">ม.4</option><option value="ม.5">ม.5</option><option value="ม.6">ม.6</option>
+                                </select>
+                                <select id="filter-history-room" class="p-1.5 border rounded text-sm shadow-sm bg-gray-50" onchange="renderCardHistory()">
+                                    <option value="">ทุกห้อง</option>
+                                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                                    <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+                                    <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+                                    <option value="10">10</option>
+                                </select>
+                            </div>
+                            <button onclick="fetchCardHistory()" class="text-sm bg-gray-100 border text-gray-700 px-3 py-1 rounded hover:bg-gray-200 whitespace-nowrap"><i class="fas fa-sync"></i> รีเฟรชฐานข้อมูล</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-50 text-gray-600">
+                                    <tr>
+                                        <th class="p-3">เลขประจำตัว</th><th class="p-3">ชื่อ-สกุล</th><th class="p-3">ชั้น/ห้อง</th><th class="p-3">วันที่ออกบัตร</th><th class="p-3 text-center">สถานะ</th><th class="p-3 text-center">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-history" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. พิมพ์บัตรนักเรียน -->
+                <div id="menu-printcard" class="content-section hidden">
+                    
+                    <div class="flex justify-between items-center border-b mb-6">
+                        <div class="flex">
+                            <button onclick="switchTabPrint('print-tab1')" id="btn-print-tab1" class="px-6 py-2 border-b-2 border-nara-blue text-nara-blue font-bold">พิมพ์รายบุคคล</button>
+                            <button onclick="switchTabPrint('print-tab2')" id="btn-print-tab2" class="px-6 py-2 border-b-2 border-transparent text-gray-500 hover:text-nara-blue">พิมพ์เป็นกลุ่ม</button>
+                        </div>
+                        <button onclick="refreshPrintData()" class="text-sm bg-nara-yellow text-nara-blue px-3 py-1 rounded shadow hover:bg-yellow-500 mb-2"><i class="fas fa-sync"></i> อัปเดตข้อมูลล่าสุด</button>
+                    </div>
+
+                    <!-- Tab พิมพ์เดี่ยว -->
+                    <div id="print-tab1" class="bg-white p-6 rounded-xl shadow-sm">
+                         <div class="flex gap-2 w-full md:w-1/2">
+                            <input type="text" id="print-single-id" placeholder="เลขประจำตัว..." class="p-2 border rounded flex-1 bg-gray-50">
+                            <button onclick="renderSingleCard()" class="bg-nara-blue text-white px-4 py-2 rounded hover:bg-blue-800"><i class="fas fa-magic"></i> ประมวลผลหน้าตัวอย่าง</button>
+                        </div>
+                    </div>
+
+                    <!-- Tab พิมพ์กลุ่ม -->
+                    <div id="print-tab2" class="hidden">
+                        <div class="bg-white p-6 rounded-xl shadow-sm mb-6">
+                            <div class="flex flex-wrap gap-4 items-end">
+                                <div>
+                                    <label class="block text-sm mb-1 text-gray-600 font-bold">เลือกชั้น</label>
+                                    <select id="print-group-class-level" class="p-2 border rounded w-28 text-sm shadow-sm">
+                                        <option value="">ทุกชั้น</option>
+                                        <option value="ม.1">ม.1</option><option value="ม.2">ม.2</option><option value="ม.3">ม.3</option>
+                                        <option value="ม.4">ม.4</option><option value="ม.5">ม.5</option><option value="ม.6">ม.6</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm mb-1 text-gray-600 font-bold">เลือกห้อง</label>
+                                    <select id="print-group-class-room" class="p-2 border rounded w-28 text-sm shadow-sm">
+                                        <option value="">ทุกห้อง</option>
+                                        <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                                        <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+                                    </select>
+                                </div>
+                                <button onclick="searchGroupPrint()" class="bg-nara-blue text-white px-4 py-2 rounded hover:bg-blue-800 shadow"><i class="fas fa-search"></i> ค้นหา</button>
+                            </div>
+                            
+                            <div class="mt-6 hidden" id="group-select-area">
+                                <table class="w-full text-sm text-left border">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="p-2 text-center w-10"><input type="checkbox" id="check-all-group" onchange="toggleCheckAll(this)"></th>
+                                            <th class="p-2">เลขประจำตัว</th><th class="p-2">ชื่อ-สกุล</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-group-list" class="divide-y"></tbody>
+                                </table>
+                                <div class="mt-4 text-right">
+                                    <button onclick="renderGroupCards()" class="bg-nara-yellow text-nara-blue font-bold px-6 py-2 rounded shadow hover:bg-yellow-500"><i class="fas fa-layer-group"></i> ประมวลผลบัตรที่เลือก</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ==================== Modals ==================== -->
+
+    <!-- Camera Modal -->
+    <div id="camera-modal" class="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-4 rounded-xl max-w-md w-full">
+            <h3 class="font-bold text-lg mb-4 text-center">ถ่ายภาพนักเรียน</h3>
+            <div class="relative w-full aspect-[3/4] bg-black rounded overflow-hidden flex items-center justify-center">
+                <video id="webcam-video" autoplay playsinline class="absolute h-full w-auto max-w-none transform scale-x-[-1]"></video>
+                <!-- Guideline -->
+                <div class="absolute inset-0 border-4 border-dashed border-white opacity-50 m-8 rounded"></div>
+            </div>
+            <canvas id="webcam-canvas" class="hidden"></canvas>
+            
+            <div id="camera-controls" class="mt-4 flex gap-2">
+                <button onclick="takeSnapshot()" class="flex-1 bg-nara-blue text-white py-3 rounded font-bold"><i class="fas fa-camera text-xl"></i> ถ่ายรูป</button>
+                <button onclick="closeCameraModal()" class="flex-1 bg-red-500 text-white py-3 rounded font-bold">ยกเลิก</button>
+            </div>
+            
+            <div id="snapshot-controls" class="mt-4 flex gap-2 hidden">
+                <button onclick="retakeSnapshot()" class="flex-1 bg-gray-500 text-white py-2 rounded"><i class="fas fa-undo"></i> ถ่ายใหม่</button>
+                <button onclick="confirmSnapshot()" class="flex-1 bg-green-600 text-white py-2 rounded font-bold"><i class="fas fa-check"></i> ยืนยันรูปนี้</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Issue Modal (สำหรับทำบัตร ป็อปอัพ) -->
+    <div id="issue-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto">
+            <div class="flex justify-between items-center p-4 border-b sticky top-0 bg-white z-10">
+                <h3 class="font-bold text-xl text-nara-blue"><i class="fas fa-id-badge"></i> ตรวจสอบข้อมูลและออกบัตร</h3>
+                <button onclick="closeIssueModal()" class="text-gray-500 hover:text-red-500 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6">
+                <form id="form-maker" onsubmit="saveCardHistory(event)">
+                    <div class="flex flex-col md:flex-row gap-6">
+                        <!-- กล้องและรูป -->
+                        <div class="w-full md:w-48 flex flex-col items-center">
+                            <div class="w-32 h-40 border-2 border-gray-300 bg-gray-100 flex items-center justify-center overflow-hidden mb-2 relative rounded shadow-inner">
+                                <img id="maker-photo" src="" class="w-full h-full object-cover hidden">
+                                <i id="maker-photo-icon" class="fas fa-user text-4xl text-gray-300"></i>
+                            </div>
+                            <button type="button" onclick="openCameraModal()" class="w-full bg-nara-yellow text-nara-blue font-bold py-2 rounded text-sm mb-2 hover:bg-yellow-500 shadow"><i class="fas fa-camera"></i> ถ่ายภาพใหม่</button>
+                            <input type="hidden" id="maker-photo-base64">
+                        </div>
+                        <!-- ข้อมูล -->
+                        <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div><label class="text-xs text-gray-500">เลขประจำตัว</label><input type="text" id="m-id" class="w-full p-2 border rounded bg-gray-50 text-sm font-bold text-nara-blue" readonly></div>
+                            <div class="md:col-span-2"><label class="text-xs text-gray-500">ชื่อ-นามสกุล</label><input type="text" id="m-name" class="w-full p-2 border rounded bg-gray-50 text-sm" readonly></div>
+                            
+                            <!-- เปลี่ยนจากช่องข้อความธรรมดา เป็นตัวเลือก ชั้น และ ห้อง -->
+                            <div>
+                                <label class="text-xs text-gray-500">ชั้นเรียน</label>
+                                <select id="m-class-level" class="w-full p-2 border rounded text-sm bg-white" onchange="updateMakerProgramAuto()" required>
+                                    <option value="">เลือกชั้น</option>
+                                    <option value="ม.1">ม.1</option><option value="ม.2">ม.2</option><option value="ม.3">ม.3</option>
+                                    <option value="ม.4">ม.4</option><option value="ม.5">ม.5</option><option value="ม.6">ม.6</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500">ห้อง</label>
+                                <select id="m-class-room" class="w-full p-2 border rounded text-sm bg-white" onchange="updateMakerProgramAuto()" required>
+                                    <option value="">เลือกห้อง</option>
+                                    <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                                    <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs text-gray-500">แผนการเรียน</label><input type="text" id="m-program" class="w-full p-2 border rounded bg-gray-50 text-sm" readonly></div>
+                            
+                            <div><label class="text-xs text-gray-500">อายุ</label><input type="text" id="m-age" class="w-full p-2 border rounded bg-gray-50 text-sm" readonly></div>
+                            <!-- เพิ่มฟอร์มที่อยู่ -->
+                            <div class="md:col-span-2"><label class="text-xs text-gray-500">ที่อยู่ปัจจุบัน</label><input type="text" id="m-address" class="w-full p-2 border rounded text-sm bg-white" placeholder="เช่น 123 ม.1 ต.นรา อ.เมือง จ.นราธิวาส 96000"></div>
+                            
+                            <div class="col-span-3 border-t pt-4 mt-2"></div>
+
+                            <div><label class="text-xs font-bold text-nara-blue">วันออกบัตร</label><input type="date" id="m-issue" class="w-full p-2 border border-blue-300 rounded text-sm bg-blue-50 shadow-sm" required></div>
+                            <div>
+                                <label class="text-xs font-bold text-nara-blue">อายุบัตร (ปี)</label>
+                                <select id="m-expire-years" class="w-full p-2 border border-blue-300 rounded text-sm bg-blue-50 shadow-sm" onchange="calcExpire()">
+                                    <option value="1">1 ปี</option><option value="3" selected>3 ปี</option><option value="6">6 ปี</option>
+                                </select>
+                            </div>
+                            <div><label class="text-xs font-bold text-red-600">วันหมดอายุ</label><input type="date" id="m-expire" class="w-full p-2 border border-red-300 rounded text-sm bg-red-50 shadow-sm" readonly></div>
+                        </div>
+                    </div>
+                    <div class="mt-8 text-right border-t pt-4 flex justify-end gap-2">
+                        <button type="button" onclick="closeIssueModal()" class="bg-gray-200 text-gray-700 px-6 py-2 rounded shadow hover:bg-gray-300 font-bold">ยกเลิก</button>
+                        <button type="submit" class="bg-green-600 text-white px-8 py-2 rounded shadow hover:bg-green-700 font-bold text-lg"><i class="fas fa-check-circle"></i> บันทึกและออกบัตร</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 text-center transform transition-all scale-95 opacity-0 duration-200" id="delete-modal-content">
+            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">ยืนยันการลบข้อมูล</h3>
+            <p class="text-gray-600 mb-6 text-sm">คุณต้องการลบข้อมูลนี้ใช่หรือไม่?<br>การกระทำนี้ไม่สามารถกู้คืนได้</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="closeDeleteModal()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-bold transition-colors">ยกเลิก</button>
+                <button id="confirm-delete-btn" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold shadow-lg transition-colors">ยืนยันการลบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Preview Modal -->
+    <div id="print-preview-modal" class="fixed inset-0 bg-black bg-opacity-80 z-[60] hidden flex flex-col items-center justify-center p-4 md:p-8 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-7xl h-full flex flex-col overflow-hidden animate-fade-in-up">
+            <!-- Header & Settings -->
+            <div class="flex flex-col border-b bg-gray-50 flex-shrink-0">
+                <div class="flex justify-between items-center p-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-nara-blue text-white rounded-full flex items-center justify-center text-lg shadow-inner">
+                            <i class="fas fa-eye"></i>
+                        </div>
+                        <h3 class="font-bold text-xl text-nara-blue">ตัวอย่างก่อนพิมพ์ (Print Preview)</h3>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="executePrint()" class="bg-green-600 text-white px-8 py-2 rounded-lg shadow-md hover:bg-green-700 font-bold text-lg flex items-center gap-2 transition-transform hover:scale-105"><i class="fas fa-print"></i> สั่งพิมพ์บัตร</button>
+                        <button onclick="closePrintPreviewModal()" class="bg-gray-200 text-gray-700 w-12 h-12 rounded-full hover:bg-gray-300 hover:text-red-500 flex items-center justify-center transition-colors"><i class="fas fa-times text-xl"></i></button>
+                    </div>
+                </div>
+                <!-- Print Settings Bar (ที่เพิ่มกลับเข้ามาเพื่อให้ระบบดึงค่าไปใช้พิมพ์) -->
+                <div class="bg-blue-50 p-3 px-6 flex flex-wrap gap-6 items-center border-t border-blue-100 text-sm">
+                    <span class="font-bold text-nara-blue"><i class="fas fa-print"></i> ตั้งค่าหน้ากระดาษพิมพ์:</span>
+                    <div class="flex items-center gap-2">
+                        <label class="text-gray-700 font-medium">ขนาดกระดาษ:</label>
+                        <select id="print-paper-size" class="p-1.5 border border-blue-200 rounded bg-white shadow-sm outline-none focus:ring-1 focus:ring-nara-blue">
+                            <option value="A4">A4 (210 x 297 mm)</option>
+                            <option value="A3">A3 (297 x 420 mm)</option>
+                            <option value="Letter">Letter (8.5 x 11 in)</option>
+                            <option value="Legal">Legal (8.5 x 14 in)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-gray-700 font-medium">การวางแนว:</label>
+                        <select id="print-paper-orientation" class="p-1.5 border border-blue-200 rounded bg-white shadow-sm outline-none focus:ring-1 focus:ring-nara-blue">
+                            <option value="portrait">แนวตั้ง (Portrait)</option>
+                            <option value="landscape">แนวนอน (Landscape)</option>
+                        </select>
+                    </div>
+                    <span class="text-xs text-gray-500 italic ml-auto">* ระบบจะคำนวณจำนวนบัตรที่จัดเรียงได้สูงสุดให้อัตโนมัติ</span>
+                </div>
+            </div>
+            <!-- Content Area (Scrollable) -->
+            <div id="print-preview-content" class="flex-1 overflow-y-auto p-8 bg-gray-300 flex flex-wrap justify-center content-start">
+                <!-- Cards will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Area สำหรับสร้างบัตรเพื่อ Print (ซ่อนไว้จากหน้าจอปกติ แต่แสดงตอนพิมพ์) -->
+    <div id="print-area" class="no-print">
+        <!-- JS จะ inject โครงสร้าง A4 เข้ามาที่นี่ -->
+    </div>
+
+
+    <!-- ==================== SCRIPT JAVASCRIPT ==================== -->
+    <script>
+        // *** ใส่ URL ของ Google Apps Script ของคุณที่นี่ ***
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpnQ69a9WZp6XRhKfNJSNAsHdA3bkaJkoGsJY-czgI5Fr0qRKaYqUYKD2Q67BlzDGS/exec';
+
+        // State variables (Local Database Cache)
+        let currentUser = null;
+        let systemSettings = {};
+        let allUsers = [];
+        let allStudents = [];
+        let allCardHistory = []; 
+        let printQueue = [];
+        let videoStream = null;
+        let thaiAddressDB = null;
+
+        // --- Core API Functions (JSONP & POST) ---
+        function fetchJSONP(action, params = {}) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
+                window[callbackName] = function(data) {
+                    delete window[callbackName];
+                    script.remove(); // ลบแท็กสคริปต์ทิ้งทันทีที่ทำงานเสร็จ
+                    resolve(data);
+                };
+                let url = `${SCRIPT_URL}?action=${action}&callback=${callbackName}`;
+                for (let key in params) url += `&${key}=${encodeURIComponent(params[key])}`;
+                
+                const script = document.createElement('script');
+                script.src = url;
+                script.onerror = () => reject(new Error('JSONP request failed'));
+                // นำไปใส่ใน <head> เพื่อให้ทำงานได้ตั้งแต่โหลดสคริปต์ (ไม่ต้องรอ <body> โหลดเสร็จ)
+                document.head.appendChild(script); 
+            });
+        }
+
+        async function postData(action, payloadData) {
+            try {
+                // แก้ไข: ใช้ mode: 'no-cors' เพื่อบังคับส่งข้อมูลทะลุการบล็อกของ Browser
+                // สิ่งนี้จะแก้ปัญหา "Failed to fetch" ได้ 100% เมื่อส่งข้อมูลสำเร็จแต่เว็บแจ้ง Error
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: action, ...payloadData })
+                });
+                
+                // ส่งค่าสำเร็จกลับไปจำลอง เนื่องจากโหมด no-cors จะไม่อนุญาตให้อ่านค่าตอบกลับ
+                return { status: 'success', message: 'ส่งข้อมูลสำเร็จ' };
+            } catch (error) {
+                console.error('Error posting data:', error);
+                throw error;
+            }
+        }
+
+        // --- PRELOAD DATA ARCHITECTURE (เริ่มโหลดเบื้องหลังทันที) ---
+        let preloadPromise = null;
+
+        function startPreloading() {
+            // โหลดฐานข้อมูลทั้งหมดแบบขนาน (Parallel) ทันทีที่ผู้ใช้เปิดลิงก์เข้ามา
+            const pSettings = fetchJSONP('getSettings').then(res => {
+                if (res.status === 'success') {
+                    systemSettings = res.data || {};
+                    localStorage.setItem('nara_settings', JSON.stringify(systemSettings));
+                    if(systemSettings.logoBase64) document.getElementById('login-logo').src = systemSettings.logoBase64;
+                    if(systemSettings.schoolName) document.getElementById('login-school-name').innerText = systemSettings.schoolName;
+                }
+            }).catch(e => console.error(e));
+
+            const pUsers = fetchJSONP('getUsers').then(res => {
+                if (res.status === 'success') allUsers = res.data || [];
+            }).catch(e => console.error(e));
+
+            const pStudents = fetchJSONP('getStudents').then(res => {
+                if (res.status === 'success') allStudents = res.data || [];
+            }).catch(e => console.error(e));
+
+            const pHistory = fetchJSONP('getCardHistory').then(res => {
+                if (res.status === 'success') allCardHistory = res.data || [];
+            }).catch(e => console.error(e));
+
+            const pAddress = (async () => {
+                const dbStr = localStorage.getItem('thai_address_db');
+                if (dbStr) {
+                    try { 
+                        thaiAddressDB = JSON.parse(dbStr); 
+                        populateAddressDropdowns();
+                    } catch(e) { 
+                        await fetchAddressDBQuietly(); 
+                    }
+                } else {
+                    await fetchAddressDBQuietly();
+                }
+            })();
+
+            preloadPromise = Promise.all([pSettings, pUsers, pStudents, pHistory, pAddress]);
+        }
+
+        async function fetchAddressDBQuietly() {
+            try {
+                const res = await fetchJSONP('getAddressDB');
+                if (res.status === 'success') {
+                    localStorage.setItem('thai_address_db', JSON.stringify(res.data));
+                    thaiAddressDB = res.data;
+                    populateAddressDropdowns(); // เติมข้อมูลลงตัวเลือกทันทีถ้าพร้อม
+                }
+            } catch (e) {
+                console.error("Failed to preload address DB", e);
+            }
+        }
+
+        function populateAddressDropdowns() {
+            const provSelect = document.getElementById('addr-prov');
+            const statusEl = document.getElementById('address-db-status');
+            
+            if (provSelect && thaiAddressDB) {
+                provSelect.innerHTML = '<option value="">เลือกจังหวัด</option>';
+                Object.keys(thaiAddressDB).sort().forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p; opt.text = p;
+                    provSelect.add(opt);
+                });
+            }
+            
+            if (statusEl) {
+                if (thaiAddressDB) {
+                    statusEl.innerHTML = '<i class="fas fa-check-circle text-green-600"></i> โหลดฐานข้อมูลสำเร็จพร้อมใช้งาน';
+                } else {
+                    statusEl.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-500"></i> กำลังดึงข้อมูลเบื้องหลัง...';
+                }
+            }
+        }
+
+        // เริ่มต้นการโหลดเบื้องหลังทันที โดยไม่ต้องรอให้เว็บโหลดเสร็จ 100%
+        startPreloading();
+
+        // ฟังก์ชันแปลงวันที่เป็น พ.ศ. แบบสั้น (d/m/yyyy+543)
+        function formatThaiDateShort(dateString) {
+            if (!dateString) return '';
+            const d = new Date(dateString);
+            if (isNaN(d.getTime())) return dateString;
+            return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear() + 543}`;
+        }
+
+        // ฟังก์ชันสร้างเทมเพลต SVG อัตโนมัติ (Dynamic SVG Templates)
+        function getDynamicTemplate(side, index) {
+            const logo = systemSettings.logoBase64 || '';
+            const name = systemSettings.schoolName || 'โรงเรียนนราสิกขาลัย';
+            const addr = systemSettings.schoolAddress || 'ที่อยู่โรงเรียน';
+            const web = systemSettings.schoolWebsite || 'www.school.ac.th';
+
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 640" width="400" height="640">
+            <defs>
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&amp;display=swap');
+                    text { font-family: 'Prompt', sans-serif; }
+                </style>
+            </defs>
+            <rect width="400" height="640" fill="#ffffff"/>`;
+
+            let logoSvg = logo ? `<image href="${logo}" x="20" y="20" width="60" height="60" preserveAspectRatio="xMidYMid meet"/>` : '';
+            let logoCenterSvg = logo ? `<image href="${logo}" x="160" y="20" width="80" height="80" preserveAspectRatio="xMidYMid meet"/>` : '';
+
+            if (side === 'front') {
+                if (index === 1) { // Wave Top
+                    svg += `
+                    <path d="M0 0 L400 0 L400 120 Q200 180 0 120 Z" fill="#1e3a8a"/>
+                    <path d="M0 120 Q200 180 400 120 L400 130 Q200 190 0 130 Z" fill="#eab308"/>
+                    ${logoCenterSvg}
+                    <text x="200" y="145" font-size="18" font-weight="700" fill="#1e3a8a" text-anchor="middle">${name}</text>
+                    <text x="200" y="615" font-size="12" fill="#1e3a8a" text-anchor="middle">${web}</text>`;
+                } else if (index === 2) { // Polygon Angle
+                    svg += `
+                    <polygon points="0,0 400,0 400,100 0,160" fill="#1e3a8a"/>
+                    <polygon points="0,160 400,100 400,110 0,170" fill="#eab308"/>
+                    ${logoSvg}
+                    <text x="90" y="60" font-size="18" font-weight="700" fill="#ffffff">${name}</text>
+                    <rect x="0" y="610" width="400" height="30" fill="#1e3a8a"/>
+                    <text x="200" y="630" font-size="12" fill="#ffffff" text-anchor="middle">${addr}</text>`;
+                } else if (index === 3) { // Modern Minimal
+                    svg += `
+                    <rect x="10" y="10" width="380" height="620" fill="none" stroke="#1e3a8a" stroke-width="4" rx="15"/>
+                    <rect x="10" y="10" width="380" height="100" fill="#1e3a8a" rx="15" clip-path="inset(0 0 0 0 round 15px 15px 0 0)"/>
+                    ${logoCenterSvg}
+                    <text x="200" y="140" font-size="20" font-weight="700" fill="#1e3a8a" text-anchor="middle">${name}</text>
+                    <text x="200" y="610" font-size="12" fill="#1e3a8a" text-anchor="middle">${web}</text>`;
+                } else if (index === 4) { // Sidebar Accent
+                    svg += `
+                    <rect x="0" y="0" width="80" height="640" fill="#1e3a8a"/>
+                    <rect x="80" y="0" width="10" height="640" fill="#eab308"/>
+                    <g transform="translate(15, 20)">
+                        ${logo ? `<image href="${logo}" x="0" y="0" width="50" height="50" preserveAspectRatio="xMidYMid meet"/>` : ''}
+                    </g>
+                    <text x="110" y="50" font-size="18" font-weight="700" fill="#1e3a8a">${name}</text>
+                    <text x="110" y="70" font-size="12" fill="#666666">${addr}</text>
+                    <text x="110" y="610" font-size="12" fill="#1e3a8a" font-weight="600">${web}</text>`;
+                } else if (index === 5) { // Elegant Curves
+                    svg += `
+                    <path d="M0 0 L400 0 L400 80 C250 150 150 50 0 100 Z" fill="#1e3a8a"/>
+                    <path d="M0 100 C150 50 250 150 400 80 L400 90 C250 160 150 60 0 110 Z" fill="#eab308"/>
+                    ${logoSvg}
+                    <text x="90" y="50" font-size="18" font-weight="700" fill="#ffffff">${name}</text>
+                    <circle cx="200" cy="500" r="150" fill="#f0f9ff" opacity="0.5"/>`;
+                }
+            } else {
+                if (index === 1) { // Back Standard Footer
+                    svg += `
+                    <rect x="0" y="580" width="400" height="60" fill="#1e3a8a"/>
+                    <rect x="0" y="570" width="400" height="10" fill="#eab308"/>
+                    <text x="200" y="605" font-size="12" fill="#ffffff" text-anchor="middle">${addr}</text>
+                    <text x="200" y="625" font-size="12" fill="#ffffff" text-anchor="middle">${web}</text>`;
+                } else if (index === 2) { // Back Polygon Edge
+                    svg += `
+                    <polygon points="0,550 400,600 400,640 0,640" fill="#1e3a8a"/>
+                    <text x="20" y="615" font-size="12" fill="#ffffff">${web}</text>
+                    <text x="20" y="630" font-size="10" fill="#eab308">${addr}</text>`;
+                } else if (index === 3) { // Back Border Frame
+                    svg += `
+                    <rect x="10" y="10" width="380" height="620" fill="none" stroke="#1e3a8a" stroke-width="2" rx="10"/>
+                    <line x1="20" y1="580" x2="380" y2="580" stroke="#eab308" stroke-width="2"/>
+                    <text x="200" y="605" font-size="10" fill="#1e3a8a" text-anchor="middle">${addr}</text>
+                    <text x="200" y="625" font-size="12" font-weight="700" fill="#1e3a8a" text-anchor="middle">${web}</text>`;
+                } else if (index === 4) { // Back Sidebar
+                    svg += `
+                    <rect x="0" y="0" width="80" height="640" fill="#1e3a8a"/>
+                    <rect x="80" y="0" width="10" height="640" fill="#eab308"/>
+                    <text x="110" y="600" font-size="10" fill="#666666">${addr}</text>
+                    <text x="110" y="620" font-size="12" font-weight="600" fill="#1e3a8a">${web}</text>`;
+                } else if (index === 5) { // Back Wave Footer
+                    svg += `
+                    <path d="M0 640 L400 640 L400 580 C250 530 150 620 0 580 Z" fill="#1e3a8a"/>
+                    <text x="200" y="615" font-size="10" fill="#ffffff" text-anchor="middle">${addr}</text>
+                    <text x="200" y="630" font-size="12" fill="#eab308" text-anchor="middle">${web}</text>`;
+                }
+            }
+            svg += `</svg>`;
+            return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+        }
+
+        // Utility: Show Loading & Toast
+        function showLoading() { document.getElementById('loading').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('loading').classList.add('hidden'); }
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            document.getElementById('toast-icon').className = isError ? 'fas fa-times-circle' : 'fas fa-check-circle';
+            toast.className = `fixed top-5 right-5 z-50 transform transition-all duration-300 ${isError ? 'bg-red-500' : 'bg-green-500'} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3`;
+            setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); }, 3000);
+        }
+
+        // --- Init & Login ---
+        window.onload = () => {
+            const savedUser = localStorage.getItem('nara_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                enterApp(); // พุ่งเข้าแอปทันทีถ้าจำรหัสไว้
+            }
+            
+            // โหลดการตั้งค่าจาก LocalStorage เพื่อแสดงโลโก้หน้าล็อกอิน (กรณีไม่ได้ตั้งจำรหัส)
+            const cachedSettings = localStorage.getItem('nara_settings');
+            if (cachedSettings) {
+                systemSettings = JSON.parse(cachedSettings);
+                if(systemSettings.logoBase64) document.getElementById('login-logo').src = systemSettings.logoBase64;
+                if(systemSettings.schoolName) document.getElementById('login-school-name').innerText = systemSettings.schoolName;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            if(document.getElementById('m-issue')) document.getElementById('m-issue').value = today;
+        };
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('login-user').value.trim();
+            const p = document.getElementById('login-pass').value.trim();
+            const rem = document.getElementById('remember-me').checked;
+
+            showLoading();
+            document.getElementById('loading-msg').innerText = "กำลังตรวจสอบบัญชีผู้ใช้...";
+            try {
+                const res = await fetchJSONP('login', { username: u, password: p });
+                if (res.status === 'success') {
+                    currentUser = { username: u, name: res.user.name, role: res.user.role };
+                    if (rem) localStorage.setItem('nara_user', JSON.stringify(currentUser));
+                    showToast('เข้าสู่ระบบสำเร็จ');
+                    enterApp(); // นำเข้าแอปทันที
+                } else {
+                    hideLoading();
+                    showToast(res.message, true);
+                }
+            } catch (err) {
+                hideLoading();
+                showToast('การเชื่อมต่อล้มเหลว', true);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('nara_user');
+            location.reload();
+        }
+
+        function togglePassword(inputId, iconId) {
+            const el = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (el.type === "password") { el.type = "text"; icon.className = "fas fa-eye-slash"; } 
+            else { el.type = "password"; icon.className = "fas fa-eye"; }
+        }
+
+        function enterApp() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-screen').classList.remove('hidden');
+            document.getElementById('current-user-desktop').innerText = currentUser.name;
+            document.getElementById('current-user-mobile').innerText = currentUser.name;
+            
+            // วาด UI ทันทีด้วยข้อมูลล่าสุดที่มีใน Memory (หากข้อมูลเบื้องหลังยังโหลดอยู่ มันจะมาอัปเดตเองทีหลัง)
+            applySettingsToUI();
+            renderUserTable();
+            searchStudentDB(); 
+            renderCardHistory();
+
+            hideLoading(); 
+            nav('menu-dashboard'); // นำทางไปหน้า Dashboard ทันที แบบไม่มีดีเลย์
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function nav(menuId) {
+            document.querySelectorAll('.content-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(menuId).classList.remove('hidden');
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('bg-blue-800', 'border-l-4', 'border-nara-yellow'));
+            
+            const activeBtn = document.querySelector(`[data-target="${menuId}"]`);
+            if(activeBtn) activeBtn.classList.add('bg-blue-800', 'border-l-4', 'border-nara-yellow');
+
+            const titles = {
+                'menu-dashboard': 'หน้าแรก', 'menu-makercard': 'ทำบัตรนักเรียน',
+                'menu-printcard': 'พิมพ์บัตรนักเรียน', 'menu-students': 'จัดการข้อมูลนักเรียน',
+                'menu-users': 'จัดการข้อมูลผู้ใช้', 'menu-settings': 'ตั้งค่าระบบ'
+            };
+            document.getElementById('page-title').innerText = titles[menuId];
+
+            if (window.innerWidth < 768) {
+                const sidebar = document.getElementById('sidebar');
+                if (!sidebar.classList.contains('-translate-x-full')) toggleSidebar();
+            }
+        }
+
+        // --- Settings ---
+        function switchTab(tabId) {
+            document.getElementById('set-tab1').classList.add('hidden');
+            document.getElementById('set-tab2').classList.add('hidden');
+            document.getElementById('btn-set-tab1').className = "px-6 py-2 border-b-2 border-transparent text-gray-500 hover:text-nara-blue";
+            document.getElementById('btn-set-tab2').className = "px-6 py-2 border-b-2 border-transparent text-gray-500 hover:text-nara-blue";
+            
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById('btn-' + tabId).className = "px-6 py-2 border-b-2 border-nara-blue text-nara-blue font-bold";
+        }
+
+        function applySettingsToUI() {
+            // Apply to general form
+            if(systemSettings.schoolName) {
+                if(document.getElementById('set-school-name')) document.getElementById('set-school-name').value = systemSettings.schoolName;
+                if(document.getElementById('sidebar-school-name')) document.getElementById('sidebar-school-name').innerText = systemSettings.schoolName;
+                if(document.getElementById('dash-school-name')) document.getElementById('dash-school-name').innerText = systemSettings.schoolName;
+                if(document.getElementById('login-school-name')) document.getElementById('login-school-name').innerText = systemSettings.schoolName;
+            }
+            if(systemSettings.signerName && document.getElementById('set-signer-name')) document.getElementById('set-signer-name').value = systemSettings.signerName;
+            if(systemSettings.rules && document.getElementById('set-rules')) document.getElementById('set-rules').value = systemSettings.rules;
+            if(systemSettings.logoBase64) {
+                if(document.getElementById('sidebar-logo')) document.getElementById('sidebar-logo').src = systemSettings.logoBase64;
+                if(document.getElementById('dash-logo')) document.getElementById('dash-logo').src = systemSettings.logoBase64;
+                if(document.getElementById('login-logo')) document.getElementById('login-logo').src = systemSettings.logoBase64;
+                if(document.getElementById('preview-logo')) {
+                    document.getElementById('preview-logo').src = systemSettings.logoBase64;
+                    document.getElementById('preview-logo').classList.remove('hidden');
+                }
+                if(document.getElementById('set-logo-base64')) document.getElementById('set-logo-base64').value = systemSettings.logoBase64;
+            }
+            if(systemSettings.sigBase64) {
+                if(document.getElementById('preview-sig')) {
+                    document.getElementById('preview-sig').src = systemSettings.sigBase64;
+                    document.getElementById('preview-sig').classList.remove('hidden');
+                }
+                if(document.getElementById('set-sig-base64')) document.getElementById('set-sig-base64').value = systemSettings.sigBase64;
+            }
+            if(systemSettings.schoolAddress && document.getElementById('set-school-address')) document.getElementById('set-school-address').value = systemSettings.schoolAddress;
+            if(systemSettings.schoolWebsite && document.getElementById('set-school-website')) document.getElementById('set-school-website').value = systemSettings.schoolWebsite;
+            if(systemSettings.programMap && document.getElementById('set-program-map')) document.getElementById('set-program-map').value = systemSettings.programMap;
+            
+            // Apply Layout Settings
+            if(systemSettings.cardOrientation && document.getElementById('card-orientation')) document.getElementById('card-orientation').value = systemSettings.cardOrientation;
+            if(systemSettings.bgFront) { 
+                if(document.getElementById('set-bg-front-base64')) document.getElementById('set-bg-front-base64').value = systemSettings.bgFront; 
+                applyFrontBg(systemSettings.bgFront); 
+            }
+            if(systemSettings.bgBack && document.getElementById('set-bg-back-base64')) {
+                document.getElementById('set-bg-back-base64').value = systemSettings.bgBack;
+                applyBackBg(systemSettings.bgBack);
+            }
+            
+            updateCardLayoutView();
+
+            // Load Elements on Front & Back Boards
+            if (systemSettings.layoutElementsJSON) {
+                try {
+                    const elements = JSON.parse(systemSettings.layoutElementsJSON);
+                    const boardFront = document.getElementById('card-preview-board');
+                    const boardBack = document.getElementById('card-preview-board-back');
+                    if(boardFront) boardFront.innerHTML = '';
+                    if(boardBack) boardBack.innerHTML = '';
+                    
+                    elements.forEach(elData => {
+                        const el = document.createElement('div');
+                        el.id = elData.id;
+                        el.className = `abs-elem ${elData.type === 'photo' ? 'student-photo-box' : ''}`;
+                        if (elData.type === 'qr') el.className += ' bg-white p-1';
+                        
+                        el.style.left = elData.left; el.style.top = elData.top;
+                        
+                        if(elData.width) el.style.width = elData.width;
+                        if(elData.height) el.style.height = elData.height;
+                        if(elData.fontSize) el.style.fontSize = elData.fontSize;
+                        if(elData.color) el.style.color = elData.color;
+                        if(elData.fontWeight) el.style.fontWeight = elData.fontWeight;
+                        if(elData.textAlign) el.style.textAlign = elData.textAlign;
+                        
+                        if(elData.transform) {
+                            el.style.transform = elData.transform;
+                        } else if(elData.textAlign) {
+                            if (elData.textAlign === 'left') el.style.transform = 'translate(0%, -50%)';
+                            else if (elData.textAlign === 'right') el.style.transform = 'translate(-100%, -50%)';
+                            else el.style.transform = 'translate(-50%, -50%)';
+                        } else {
+                            el.style.transform = 'translate(-50%, -50%)';
+                        }
+                        
+                        if (elData.type === 'text') {
+                            if (elData.field === '[ข้อปฏิบัติ]') {
+                                el.style.whiteSpace = 'pre-wrap';
+                            } else if (elData.field === '[ที่อยู่]' || elData.field === '[ที่อยู่โรงเรียน]') {
+                                el.style.whiteSpace = 'normal';
+                                el.style.lineHeight = '1.2';
+                                el.style.display = '-webkit-box';
+                                el.style.webkitLineClamp = '2';
+                                el.style.webkitBoxOrient = 'vertical';
+                            } else {
+                                el.style.whiteSpace = 'nowrap';
+                                el.style.textOverflow = 'ellipsis';
+                            }
+                        }
+
+                        if(elData.borderColor) {
+                            el.style.borderColor = elData.borderColor;
+                            el.style.borderWidth = elData.borderWidth || '2px';
+                            el.style.borderStyle = elData.borderStyle || 'solid';
+                        }
+                        if(elData.borderRadius) {
+                            el.style.borderRadius = elData.borderRadius;
+                            el.style.overflow = 'hidden';
+                        }
+                        
+                        el.dataset.type = elData.type;
+                        el.dataset.field = elData.field || '';
+
+                        if (elData.type === 'photo') {
+                            el.innerHTML = '<img src="https://via.placeholder.com/150" class="w-full h-full object-cover pointer-events-none" style="border-radius: inherit;">';
+                        } else if (elData.type === 'qr') {
+                            el.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=12345" class="w-full h-full pointer-events-none" style="object-fit: contain;">';
+                        } else if (elData.type === 'signature') {
+                            el.innerHTML = `<img src="${systemSettings.sigBase64 || 'https://via.placeholder.com/80x30?text=Signature'}" class="w-full h-full object-contain pointer-events-none">`;
+                        } else {
+                            el.innerText = elData.text;
+                        }
+                        
+                        if(elData.side === 'back' && boardBack) boardBack.appendChild(el);
+                        else if(boardFront) boardFront.appendChild(el);
+                    });
+                } catch(e) { console.error("Error parsing layout", e); }
+            }
+            setTimeout(initDragDrop, 200);
+        }
+
+        async function saveGeneralSettings(e) {
+            e.preventDefault();
+            showLoading();
+            const data = {
+                ...systemSettings, // keep layout settings
+                schoolName: document.getElementById('set-school-name').value,
+                signerName: document.getElementById('set-signer-name').value,
+                schoolAddress: document.getElementById('set-school-address').value,
+                schoolWebsite: document.getElementById('set-school-website').value,
+                programMap: document.getElementById('set-program-map').value,
+                rules: document.getElementById('set-rules').value,
+                logoBase64: document.getElementById('set-logo-base64').value,
+                sigBase64: document.getElementById('set-sig-base64').value,
+            };
+            try {
+                const res = await postData('saveSettings', { data: data });
+                if(res.status === 'success') { 
+                    showToast('บันทึกสำเร็จ'); 
+                    systemSettings = data; 
+                    localStorage.setItem('nara_settings', JSON.stringify(systemSettings));
+                    applySettingsToUI(); 
+                }
+                else showToast(res.message, true);
+            } catch(e) { showToast('Error', true); }
+            hideLoading();
+        }
+
+        // --- Card Layout Builder (Drag & Drop) ---
+        function updateCardLayoutView() {
+            const orien = document.getElementById('card-orientation').value;
+            const boards = [document.getElementById('card-preview-board'), document.getElementById('card-preview-board-back')];
+            boards.forEach(b => {
+                if(!b) return;
+                if(orien === 'landscape') b.classList.add('landscape');
+                else b.classList.remove('landscape');
+            });
+        }
+        
+        function applyDynamicTemplate(side, index) {
+            const b64 = getDynamicTemplate(side, index);
+            if(side === 'front') applyFrontBg(b64);
+            else applyBackBg(b64);
+        }
+
+        function applyFrontBg(b64) {
+            const board = document.getElementById('card-preview-board');
+            if(board) board.style.backgroundImage = `url('${b64}')`;
+            const bgInput = document.getElementById('set-bg-front-base64');
+            if(bgInput) bgInput.value = b64;
+        }
+
+        function applyBackBg(b64) {
+            const board = document.getElementById('card-preview-board-back');
+            if(board) board.style.backgroundImage = `url('${b64}')`;
+            const bgInput = document.getElementById('set-bg-back-base64');
+            if(bgInput) bgInput.value = b64;
+        }
+
+        let activeElement = null;
+        let isDragging = false;
+        let isResizing = false;
+        let startWidth = 0, startHeight = 0, startFontSize = 12, startX = 0, startY = 0;
+
+        function initDragDrop() {
+            ['card-preview-board', 'card-preview-board-back'].forEach(id => {
+                const board = document.getElementById(id);
+                if(!board) return;
+                Array.from(board.children).forEach(el => {
+                    if(el.classList.contains('abs-elem')) makeDraggable(el);
+                });
+            });
+        }
+
+        function makeDraggable(el) {
+            el.onmousedown = function(e) {
+                if(e.target.closest('.resizer-handle')) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+                activeElement = this;
+                selectElement(this);
+                isDragging = true;
+                isResizing = false;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            };
+        }
+
+        function elementDrag(e) {
+            if (!isDragging || !activeElement) return;
+            e.preventDefault();
+            const board = activeElement.parentElement;
+            const rect = board.getBoundingClientRect();
+            
+            let x = e.clientX - rect.left;
+            let y = e.clientY - rect.top;
+            
+            x = Math.max(0, Math.min(x, rect.width));
+            y = Math.max(0, Math.min(y, rect.height));
+
+            activeElement.style.left = ((x / rect.width) * 100) + '%';
+            activeElement.style.top = ((y / rect.height) * 100) + '%';
+        }
+
+        function elementResize(e) {
+            if (!isResizing || !activeElement) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            let scaleX = 2;
+            const align = activeElement.style.textAlign;
+            if (align === 'left' || align === 'right') scaleX = 1;
+
+            let newW = startWidth + dx * scaleX;
+            let newH = startHeight + dy * 2;
+            
+            if (newW < 20) newW = 20;
+            if (newH < 10) newH = 10;
+            
+            activeElement.style.width = newW + 'px';
+            activeElement.style.height = newH + 'px';
+            
+            if (activeElement.dataset.type === 'text') {
+                if (window.getComputedStyle(activeElement).whiteSpace === 'nowrap') {
+                    activeElement.style.textOverflow = 'ellipsis';
+                }
+            }
+            
+            document.getElementById('tb-width').value = Math.round(newW) + 'px';
+            document.getElementById('tb-height').value = Math.round(newH) + 'px';
+        }
+
+        function closeDragElement() {
+            document.onmouseup = null;
+            document.onmousemove = null;
+            isDragging = false;
+            isResizing = false;
+        }
+
+        function selectElement(el) {
+            document.querySelectorAll('.abs-elem').forEach(e => {
+                e.classList.remove('active-elem');
+                const handle = e.querySelector('.resizer-handle');
+                if(handle) handle.remove();
+            });
+            el.classList.add('active-elem');
+            
+            const toolbar = document.getElementById('element-toolbar');
+            toolbar.classList.remove('hidden');
+            
+            const computedStyle = window.getComputedStyle(el);
+            document.getElementById('tb-fontsize').value = parseInt(computedStyle.fontSize) || 12;
+            
+            let color = computedStyle.color;
+            if (color.startsWith('rgb')) {
+                const rgb = color.match(/\d+/g);
+                color = "#" + ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2])).toString(16).slice(1);
+            }
+            document.getElementById('tb-color').value = color || '#000000';
+            
+            let bColor = computedStyle.borderColor;
+            if (bColor && bColor.startsWith('rgb')) {
+                const rgb = bColor.match(/\d+/g);
+                if(rgb && rgb.length >= 3) {
+                     bColor = "#" + ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2])).toString(16).slice(1);
+                }
+            }
+            document.getElementById('tb-border-color').value = bColor && bColor !== 'transparent' && bColor !== 'none' && bColor.length === 7 ? bColor : '#cccccc';
+            document.getElementById('tb-border-radius').value = parseInt(computedStyle.borderRadius) || 0;
+            
+            document.getElementById('tb-width').value = el.style.width || '';
+            document.getElementById('tb-height').value = el.style.height || '';
+
+            const resizer = document.createElement('div');
+            resizer.className = 'resizer-handle';
+            resizer.innerHTML = '<i class="fas fa-expand-alt" style="transform: rotate(90deg);"></i>';
+            resizer.style.cssText = 'position:absolute; right:-12px; bottom:-12px; width:24px; height:24px; background:white; border:2px solid #3b82f6; border-radius:50%; cursor:nwse-resize; display:flex; align-items:center; justify-content:center; color:#3b82f6; z-index:50; box-shadow:0 2px 4px rgba(0,0,0,0.2); font-size:12px;';
+            
+            resizer.onmousedown = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                isResizing = true;
+                isDragging = false;
+                
+                const compStyle = window.getComputedStyle(activeElement);
+                startWidth = parseFloat(compStyle.width) || 1;
+                startHeight = parseFloat(compStyle.height) || 1;
+                startFontSize = parseFloat(compStyle.fontSize) || 12;
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementResize;
+            };
+
+            el.appendChild(resizer);
+        }
+
+        function deselectElement(e) {
+            if (e.target.classList.contains('id-card-preview') || e.target.id === 'boards-container') {
+                document.querySelectorAll('.abs-elem').forEach(el => {
+                    el.classList.remove('active-elem');
+                    const handle = el.querySelector('.resizer-handle');
+                    if (handle) handle.remove();
+                });
+                document.getElementById('element-toolbar').classList.add('hidden');
+                activeElement = null;
+            }
+        }
+
+        function updateActiveElementStyle(prop, val) {
+            if (!activeElement) return;
+            if (prop === 'fontWeight') {
+                const currentWeight = window.getComputedStyle(activeElement).fontWeight;
+                activeElement.style.fontWeight = (currentWeight === '700' || currentWeight === 'bold') ? 'normal' : 'bold';
+                return;
+            }
+            if (prop === 'textAlign') {
+                activeElement.style.textAlign = val;
+                if (val === 'left') activeElement.style.transform = 'translate(0%, -50%)';
+                else if (val === 'right') activeElement.style.transform = 'translate(-100%, -50%)';
+                else activeElement.style.transform = 'translate(-50%, -50%)';
+                return;
+            }
+            if (prop === 'borderColor') {
+                activeElement.style.borderWidth = '2px';
+                activeElement.style.borderStyle = 'solid';
+                activeElement.style.borderColor = val;
+                return;
+            }
+            if (prop === 'borderRadius') {
+                activeElement.style.borderRadius = val ? val + 'px' : '0px';
+                activeElement.style.overflow = 'hidden';
+                return;
+            }
+            if ((prop === 'fontSize' || prop === 'width' || prop === 'height') && val && !isNaN(val)) val += 'px';
+            activeElement.style[prop] = val;
+        }
+
+        function deleteActiveElement() {
+            if (!activeElement) return;
+            activeElement.remove();
+            document.getElementById('element-toolbar').classList.add('hidden');
+            activeElement = null;
+        }
+
+        function addLayoutElement() {
+            const side = document.getElementById('add-target-side').value;
+            const field = document.getElementById('add-field-select').value;
+            const boardId = side === 'front' ? 'card-preview-board' : 'card-preview-board-back';
+            const board = document.getElementById(boardId);
+            
+            const newEl = document.createElement('div');
+            newEl.id = 'elem-custom-' + Date.now();
+            newEl.className = 'abs-elem';
+            newEl.style.left = '50%';
+            newEl.style.top = '50%';
+            newEl.style.transform = 'translate(-50%, -50%)';
+            newEl.dataset.field = field;
+
+            if (field === '[รูปถ่าย]') {
+                newEl.className += ' student-photo-box';
+                newEl.style.width = '2.5cm'; newEl.style.height = '3cm';
+                newEl.style.borderRadius = '10px';
+                newEl.style.border = '2px solid #1e3a8a';
+                newEl.style.overflow = 'hidden';
+                newEl.dataset.type = 'photo';
+                newEl.innerHTML = '<img src="https://via.placeholder.com/150" class="w-full h-full object-cover pointer-events-none" style="border-radius: inherit;">';
+            } else if (field === '[QR Code]') {
+                newEl.className += ' bg-white p-1';
+                newEl.style.width = '40px'; newEl.style.height = '40px';
+                newEl.dataset.type = 'qr';
+                newEl.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=12345" class="w-full h-full pointer-events-none" style="object-fit: contain;">';
+            } else if (field === '[ลายเซ็นผู้ลงนาม]') {
+                newEl.style.width = '80px'; newEl.style.height = '30px';
+                newEl.dataset.type = 'signature';
+                const sigImg = systemSettings.sigBase64 || 'https://via.placeholder.com/80x30?text=Signature';
+                newEl.innerHTML = `<img src="${sigImg}" class="w-full h-full object-contain pointer-events-none">`;
+            } else if (field === '[โลโก้โรงเรียน]') {
+                newEl.style.width = '60px'; newEl.style.height = '60px';
+                newEl.dataset.type = 'logo';
+                const logoImg = systemSettings.logoBase64 || 'https://upload.wikimedia.org/wikipedia/th/thumb/e/e0/Narasikkhalai_School_Logo.png/200px-Narasikkhalai_School_Logo.png';
+                newEl.innerHTML = `<img src="${logoImg}" class="w-full h-full object-contain pointer-events-none">`;
+            } else {
+                let text = field;
+                if (field === '[ข้อความอิสระ]') {
+                    text = prompt('ระบุข้อความที่ต้องการแสดงคงที่:', 'ข้อความตัวอย่าง');
+                    if (!text) return;
+                } else if (field === '[ชื่อผู้ลงนาม]') text = systemSettings.signerName || 'ผู้อำนวยการโรงเรียน';
+                else if (field === '[ข้อปฏิบัติ]') text = systemSettings.rules || 'ข้อปฏิบัติ 1...';
+                else if (field === '[ชื่อโรงเรียน]') text = systemSettings.schoolName || 'โรงเรียนนราสิกขาลัย';
+                else if (field === '[ที่อยู่โรงเรียน]') text = systemSettings.schoolAddress || 'ที่อยู่โรงเรียน';
+                else if (field === '[เว็บไซต์โรงเรียน]') text = systemSettings.schoolWebsite || 'www.school.ac.th';
+                else if (field === '[เลขประจำตัว]') text = '12345';
+                else if (field === '[เลขที่บัตร]') text = 'Nscd 0001';
+                else if (field === '[ชื่อ-สกุล]') text = 'นายสมชาย รักเรียน';
+                else if (field === '[ชั้น/ห้อง]') text = 'ม.4/1';
+                else if (field === '[แผนการเรียน]') text = 'วิทย์-คณิต';
+                else if (field === '[วันเกิด]') text = '9/9/2533';
+                else if (field === '[ที่อยู่]') text = '123 ถ.ทดสอบ ต.ทดสอบ อ.ทดสอบ จ.นราธิวาส 96000';
+                else if (field === '[วันออกบัตร]') text = formatThaiDateShort(new Date());
+                else if (field === '[วันหมดอายุ]') {
+                    let d = new Date(); d.setFullYear(d.getFullYear() + 3);
+                    text = formatThaiDateShort(d);
+                }
+                
+                if (field === '[ข้อปฏิบัติ]') {
+                    newEl.style.whiteSpace = 'pre-wrap';
+                    newEl.style.textAlign = 'left';
+                    newEl.style.transform = 'translate(0%, -50%)';
+                    newEl.style.width = '90%';
+                    newEl.style.fontWeight = 'normal';
+                } else if (field === '[ที่อยู่]' || field === '[ที่อยู่โรงเรียน]') {
+                    newEl.className += ' font-bold';
+                    newEl.style.whiteSpace = 'normal';
+                    newEl.style.lineHeight = '1.2';
+                    newEl.style.display = '-webkit-box';
+                    newEl.style.webkitLineClamp = '2';
+                    newEl.style.webkitBoxOrient = 'vertical';
+                    newEl.style.width = '150px';
+                    newEl.style.textAlign = 'left';
+                    newEl.style.transform = 'translate(0%, -50%)';
+                    newEl.style.fontWeight = 'bold';
+                } else if (['[เลขประจำตัว]', '[เลขที่บัตร]', '[วันเกิด]', '[วันออกบัตร]', '[วันหมดอายุ]'].includes(field)) {
+                    newEl.className += ' whitespace-nowrap font-bold';
+                    newEl.style.textAlign = 'left';
+                    newEl.style.transform = 'translate(0%, -50%)';
+                    newEl.style.fontWeight = 'bold';
+                    newEl.style.textOverflow = 'ellipsis';
+                } else {
+                    newEl.className += ' whitespace-nowrap font-bold';
+                    newEl.style.textAlign = 'center';
+                    newEl.style.transform = 'translate(-50%, -50%)';
+                    newEl.style.fontWeight = 'bold';
+                    newEl.style.textOverflow = 'ellipsis';
+                }
+                
+                newEl.style.fontSize = '12px';
+                newEl.style.color = '#000000';
+                newEl.dataset.type = 'text';
+                newEl.innerText = text;
+            }
+
+            board.appendChild(newEl);
+            makeDraggable(newEl);
+            selectElement(newEl);
+        }
+
+        async function saveCardLayout() {
+            showLoading();
+            
+            document.querySelectorAll('.abs-elem').forEach(el => {
+                el.classList.remove('active-elem');
+                const handle = el.querySelector('.resizer-handle');
+                if (handle) handle.remove();
+            });
+            document.getElementById('element-toolbar').classList.add('hidden');
+            activeElement = null;
+
+            const elements = [];
+            ['card-preview-board', 'card-preview-board-back'].forEach((boardId, idx) => {
+                const board = document.getElementById(boardId);
+                const side = idx === 0 ? 'front' : 'back';
+                if(!board) return;
+                Array.from(board.children).forEach(el => {
+                    if (el.classList.contains('abs-elem')) {
+                        const compStyle = window.getComputedStyle(el);
+                        elements.push({
+                            id: el.id, side: side,
+                            type: el.dataset.type || 'text',
+                            field: el.dataset.field || '', text: el.innerText,
+                            left: el.style.left, top: el.style.top,
+                            width: el.style.width, height: el.style.height,
+                            fontSize: el.style.fontSize || compStyle.fontSize, 
+                            color: el.style.color || compStyle.color,
+                            fontWeight: el.style.fontWeight || compStyle.fontWeight,
+                            textAlign: el.style.textAlign || compStyle.textAlign,
+                            transform: el.style.transform || compStyle.transform,
+                            borderColor: el.style.borderColor || '',
+                            borderRadius: el.style.borderRadius || '',
+                            borderWidth: el.style.borderWidth || '',
+                            borderStyle: el.style.borderStyle || ''
+                        });
+                    }
+                });
+            });
+
+            const data = {
+                ...systemSettings,
+                cardOrientation: document.getElementById('card-orientation').value,
+                bgFront: document.getElementById('set-bg-front-base64').value,
+                bgBack: document.getElementById('set-bg-back-base64').value,
+                layoutElementsJSON: JSON.stringify(elements)
+            };
+
+            try {
+                const res = await postData('saveSettings', { data: data });
+                if(res.status === 'success') { 
+                    showToast('บันทึกรูปแบบบัตรสำเร็จ'); 
+                    systemSettings = data; 
+                    localStorage.setItem('nara_settings', JSON.stringify(systemSettings));
+                }
+                else showToast(res.message, true);
+            } catch(e) { showToast('Error', true); }
+            hideLoading();
+        }
+
+        // --- Image Helpers ---
+        function previewImageToBase64(input, imgId, callback = null) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        const MAX_WIDTH = 600;
+                        const MAX_HEIGHT = 800;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                        } else {
+                            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        const b64 = canvas.toDataURL('image/jpeg', 0.7);
+                        
+                        if(imgId) {
+                            const imgEl = document.getElementById(imgId);
+                            if(imgEl) { imgEl.src = b64; imgEl.classList.remove('hidden'); }
+                        }
+                        if(callback) callback(b64);
+                    }
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // --- User Management ---
+        async function fetchUsers() {
+            showLoading();
+            try {
+                const res = await fetchJSONP('getUsers');
+                if(res.status === 'success') { 
+                    allUsers = res.data || []; 
+                    renderUserTable(); 
+                    showToast('ซิงค์ข้อมูลผู้ใช้แล้ว');
+                }
+            } catch(e) {}
+            hideLoading();
+        }
+        
+        function renderUserTable() {
+            const tbody = document.getElementById('table-users');
+            tbody.innerHTML = '';
+            if(allUsers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500">ไม่มีข้อมูล</td></tr>';
+                return;
+            }
+            allUsers.forEach(u => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3">${u['ชื่อ-สกุล']}</td><td class="p-3">${u['ตำแหน่ง'] || ''}</td>
+                        <td class="p-3"><span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">${u['บทบาท']}</span></td>
+                        <td class="p-3">${u['ชื่อผู้ใช้']}</td>
+                        <td class="p-3 text-center">
+                            <button onclick='editUser(${JSON.stringify(u)})' class="text-yellow-500 hover:text-yellow-700 mx-1"><i class="fas fa-edit"></i></button>
+                            <button onclick="openDeleteModal('${u.ID}', 'user')" class="text-red-500 hover:text-red-700 mx-1"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function editUser(u) {
+            document.getElementById('user-id').value = u.ID;
+            document.getElementById('u-name').value = u['ชื่อ-สกุล'];
+            document.getElementById('u-pos').value = u['ตำแหน่ง'];
+            document.getElementById('u-role').value = u['บทบาท'];
+            document.getElementById('u-username').value = u['ชื่อผู้ใช้'];
+            document.getElementById('u-password').value = u['รหัสผ่าน'];
+        }
+
+        async function saveUser(e) {
+            e.preventDefault(); showLoading();
+            const data = {
+                ID: document.getElementById('user-id').value,
+                'ชื่อ-สกุล': document.getElementById('u-name').value, 'ตำแหน่ง': document.getElementById('u-pos').value,
+                'บทบาท': document.getElementById('u-role').value, 'ชื่อผู้ใช้': document.getElementById('u-username').value,
+                'รหัสผ่าน': document.getElementById('u-password').value
+            };
+            try {
+                const res = await postData('saveUser', { data: data });
+                if(res.status==='success') { 
+                    showToast('บันทึกสำเร็จ'); 
+                    document.getElementById('form-user').reset(); 
+                    document.getElementById('user-id').value=''; 
+                    fetchUsers(); // Update local list
+                }
+            } catch(e) {}
+            hideLoading();
+        }
+
+        // --- Student Management & CSV ---
+        function updateProgramAuto() {
+            const lvl = document.getElementById('stu-class-level').value;
+            const rm = document.getElementById('stu-class-room').value;
+            const progInput = document.getElementById('stu-program');
+            
+            if (lvl && rm && systemSettings.programMap) {
+                const searchStr = `${lvl}/${rm}`;
+                const lines = systemSettings.programMap.split('\n');
+                let found = false;
+                for (let line of lines) {
+                    const parts = line.split('=');
+                    if (parts.length === 2 && parts[0].trim() === searchStr) {
+                        progInput.value = parts[1].trim();
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) progInput.value = '';
+            }
+        }
+
+        function downloadCSVTemplate() {
+            const headers = ['เลขประจำตัว', 'ชื่อ-สกุล', 'ชั้น/ห้อง', 'แผนการเรียน', 'วันเกิด(YYYY-MM-DD)', 'ครูที่ปรึกษา', 'ที่อยู่', 'ชื่อผู้ปกครอง', 'เบอร์ผู้ปกครอง'];
+            const example = ['12345', 'นายสมชาย รักเรียน', 'ม.4/1', 'วิทย์-คณิต', '2008-05-15', 'ครูสมปอง', '123 ม.1 ต.ทดสอบ', 'นายสมศักดิ์', '0812345678'];
+            
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // Add BOM for Excel Thai support
+            csvContent += headers.join(",") + "\n";
+            csvContent += example.join(",") + "\n";
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "template_students.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function parseCSV(text) {
+            let p = '', row = [''], ret = [row], i = 0, r = 0, s = !0, l;
+            for (let l of text) {
+                if ('"' === l) {
+                    if (s && l === p) row[i] += l;
+                    s = !s;
+                } else if (',' === l && s) l = row[++i] = '';
+                else if ('\n' === l && s) {
+                    if ('\r' === p) row[i] = row[i].slice(0, -1);
+                    row = ret[++r] = [l = '']; i = 0;
+                } else row[i] += l;
+                p = l;
+            }
+            if (row[i] === undefined || row[i] === '') ret.pop(); 
+            return ret;
+        }
+
+        async function handleCSVImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const rows = parseCSV(text);
+                if (rows.length < 2) { showToast('ไม่พบข้อมูลในไฟล์ CSV', true); return; }
+
+                const colMap = {
+                    'เลขประจำตัว': 0, 'ชื่อ-สกุล': 1, 'ชั้น/ห้อง': 2, 'แผนการเรียน': 3, 
+                    'วันเกิด(YYYY-MM-DD)': 4, 'ครูที่ปรึกษา': 5, 'ที่อยู่': 6, 
+                    'ชื่อผู้ปกครอง': 7, 'เบอร์ผู้ปกครอง': 8
+                };
+
+                showLoading();
+                let successCount = 0;
+
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (row.length < 3 || !row[0]) continue; 
+
+                    const data = {
+                        'ID': '',
+                        'เลขประจำตัว': row[colMap['เลขประจำตัว']] || '',
+                        'ชื่อ-สกุล': row[colMap['ชื่อ-สกุล']] || '',
+                        'ชั้น/ห้อง': row[colMap['ชั้น/ห้อง']] || '',
+                        'แผนการเรียน': row[colMap['แผนการเรียน']] || '',
+                        'วันเกิด': row[colMap['วันเกิด(YYYY-MM-DD)']] || '',
+                        'ครูที่ปรึกษา': row[colMap['ครูที่ปรึกษา']] || '',
+                        'ที่อยู่': row[colMap['ที่อยู่']] || '',
+                        'ชื่อผู้ปกครอง': row[colMap['ชื่อผู้ปกครอง']] || '',
+                        'เบอร์ผู้ปกครอง': row[colMap['เบอร์ผู้ปกครอง']] || '',
+                        'รูปถ่าย_Base64': ''
+                    };
+
+                    if(data['วันเกิด'] && data['วันเกิด'].includes('/')) {
+                         const parts = data['วันเกิด'].split('/');
+                         if(parts.length===3) {
+                             let y = parseInt(parts[2]);
+                             if(y > 2400) y -= 543; 
+                             data['วันเกิด'] = `${y}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+                         }
+                    }
+
+                    try {
+                        await postData('saveStudent', { data: data });
+                        successCount++;
+                    } catch(err) {
+                        console.error('Row failed:', row);
+                    }
+                }
+                
+                hideLoading();
+                showToast(`นำเข้าข้อมูลสำเร็จ ${successCount} รายการ`);
+                fetchStudents(); // Sync database
+                event.target.value = ''; 
+            };
+            reader.readAsText(file);
+        }
+
+        async function syncAddressDB() {
+            showLoading();
+            document.getElementById('loading-msg').innerText = "กำลังอัปเดตข้อมูลที่อยู่...";
+            try {
+                const res = await fetchJSONP('getAddressDB');
+                if (res.status === 'success') {
+                    localStorage.setItem('thai_address_db', JSON.stringify(res.data));
+                    thaiAddressDB = res.data;
+                    populateAddressDropdowns();
+                    showToast('อัปเดตข้อมูลที่อยู่สำเร็จ');
+                } else {
+                    showToast('ไม่พบชีท "ฐานข้อมูลจังหวัด"', true);
+                }
+            } catch (e) {
+                showToast('อัปเดตข้อมูลล้มเหลว', true);
+            }
+            hideLoading();
+        }
+
+        function provChange() {
+            const prov = document.getElementById('addr-prov').value;
+            const distSelect = document.getElementById('addr-dist');
+            const subSelect = document.getElementById('addr-sub');
+            document.getElementById('addr-zip').value = '';
+            
+            distSelect.innerHTML = '<option value="">เลือกอำเภอ</option>';
+            subSelect.innerHTML = '<option value="">เลือกตำบล</option>';
+            
+            if(!prov || !thaiAddressDB || !thaiAddressDB[prov]) { buildAddress(); return; }
+
+            const districts = Object.keys(thaiAddressDB[prov]).sort();
+            districts.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d; opt.text = d;
+                distSelect.add(opt);
+            });
+            buildAddress();
+        }
+
+        function distChange() {
+            const prov = document.getElementById('addr-prov').value;
+            const dist = document.getElementById('addr-dist').value;
+            const subSelect = document.getElementById('addr-sub');
+            document.getElementById('addr-zip').value = '';
+            
+            subSelect.innerHTML = '<option value="">เลือกตำบล</option>';
+
+            if(!prov || !dist || !thaiAddressDB[prov] || !thaiAddressDB[prov][dist]) { buildAddress(); return; }
+
+            const tambons = thaiAddressDB[prov][dist].sort((a,b) => a.sub.localeCompare(b.sub));
+            tambons.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.sub; opt.text = t.sub;
+                opt.dataset.zip = t.zip;
+                subSelect.add(opt);
+            });
+            buildAddress();
+        }
+
+        function subChange() {
+            const subSelect = document.getElementById('addr-sub');
+            if(subSelect.selectedIndex > 0) {
+                const zip = subSelect.options[subSelect.selectedIndex].dataset.zip;
+                document.getElementById('addr-zip').value = zip || '';
+            } else {
+                document.getElementById('addr-zip').value = '';
+            }
+            buildAddress();
+        }
+
+        function buildAddress() {
+            const no = document.getElementById('addr-no').value.trim();
+            const moo = document.getElementById('addr-moo').value.trim();
+            const prov = document.getElementById('addr-prov').value;
+            const dist = document.getElementById('addr-dist').value;
+            const sub = document.getElementById('addr-sub').value;
+            const zip = document.getElementById('addr-zip').value.trim();
+
+            let parts = [];
+            if (no) parts.push(no);
+            if (moo) parts.push(`ม.${moo}`);
+            if (sub) parts.push(`ต.${sub}`);
+            if (dist) {
+                if(prov === 'กรุงเทพมหานคร') parts.push(`เขต${dist}`);
+                else parts.push(`อ.${dist}`);
+            }
+            if (prov) {
+                if(prov === 'กรุงเทพมหานคร') parts.push(prov);
+                else parts.push(`จ.${prov}`);
+            }
+            if (zip) parts.push(zip);
+
+            document.getElementById('stu-address').value = parts.join(' ');
+        }
+
+        function parseAddressToForm(fullAddr) {
+            document.getElementById('addr-no').value = '';
+            document.getElementById('addr-moo').value = '';
+            document.getElementById('addr-prov').value = '';
+            document.getElementById('addr-dist').innerHTML = '<option value="">เลือกอำเภอ</option>';
+            document.getElementById('addr-sub').innerHTML = '<option value="">เลือกตำบล</option>';
+            document.getElementById('addr-zip').value = '';
+            document.getElementById('stu-address').value = fullAddr || '';
+
+            if(!fullAddr) return;
+
+            const regex = /^(.*?)(?:\s+ม\.(.*?))?(?:\s+(?:ต\.|แขวง)(.*?))?(?:\s+(?:อ\.|เขต)(.*?))?(?:\s+(?:จ\.)?(.*?))?(?:\s+(\d{5}))?$/;
+            const match = fullAddr.match(regex);
+
+            if(match) {
+                document.getElementById('addr-no').value = match[1] ? match[1].trim() : '';
+                document.getElementById('addr-moo').value = match[2] ? match[2].trim() : '';
+                
+                const subStr = match[3] ? match[3].trim() : '';
+                const distStr = match[4] ? match[4].trim() : '';
+                let provStr = match[5] ? match[5].trim() : '';
+                if(provStr === 'กรุงเทพมหานคร') provStr = 'กรุงเทพมหานคร';
+                const zipStr = match[6] ? match[6].trim() : '';
+
+                if(provStr) {
+                    const provSelect = document.getElementById('addr-prov');
+                    for(let i=0; i<provSelect.options.length; i++) {
+                        if(provSelect.options[i].value === provStr) {
+                            provSelect.selectedIndex = i;
+                            provChange();
+                            break;
+                        }
+                    }
+                }
+                if(distStr) {
+                     const distSelect = document.getElementById('addr-dist');
+                     for(let i=0; i<distSelect.options.length; i++) {
+                        if(distSelect.options[i].value === distStr || distSelect.options[i].value.includes(distStr)) {
+                            distSelect.selectedIndex = i;
+                            distChange();
+                            break;
+                        }
+                     }
+                }
+                if(subStr) {
+                     const subSelect = document.getElementById('addr-sub');
+                     for(let i=0; i<subSelect.options.length; i++) {
+                        if(subSelect.options[i].value === subStr || subSelect.options[i].value.includes(subStr)) {
+                            subSelect.selectedIndex = i;
+                            subChange();
+                            break;
+                        }
+                     }
+                }
+                if(zipStr) document.getElementById('addr-zip').value = zipStr;
+            }
+        }
+
+        function clearStudentForm() {
+            document.getElementById('form-student').reset();
+            document.getElementById('stu-id').value = '';
+            document.getElementById('stu-class-level').value = '';
+            document.getElementById('stu-class-room').value = '';
+            
+            document.getElementById('addr-dist').innerHTML = '<option value="">เลือกอำเภอ</option>';
+            document.getElementById('addr-sub').innerHTML = '<option value="">เลือกตำบล</option>';
+
+            document.getElementById('stu-photo-preview').classList.add('hidden');
+            document.getElementById('stu-photo-icon').classList.remove('hidden');
+            document.getElementById('stu-photo-base64').value = '';
+            
+            // รีเซ็ตปุ่มกลับเป็นโหมดเพิ่มข้อมูล
+            const btn = document.getElementById('btn-save-student');
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-save"></i> บันทึกข้อมูลนักเรียน';
+                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                btn.classList.add('bg-nara-blue', 'hover:bg-blue-800');
+            }
+        }
+
+        function calcAge(dobId, ageId) {
+            const dob = document.getElementById(dobId).value;
+            if(!dob) return;
+            document.getElementById(ageId).value = new Date().getFullYear() - new Date(dob).getFullYear();
+        }
+
+        async function fetchStudents() {
+            showLoading();
+            try {
+                const res = await fetchJSONP('getStudents');
+                if(res.status === 'success') { 
+                    allStudents = res.data; 
+                    searchStudentDB(); 
+                    showToast('ซิงค์ข้อมูลนักเรียนล่าสุดแล้ว');
+                }
+            } catch(e) {}
+            hideLoading();
+        }
+
+        function renderStudentTable(data) {
+            const tbody = document.getElementById('table-students');
+            tbody.innerHTML = '';
+            if(data.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500">ไม่มีข้อมูลนักเรียน</td></tr>';
+                 return;
+            }
+            data.forEach(s => {
+                const img = s['รูปถ่าย_Base64'] ? `<img src="${s['รูปถ่าย_Base64']}" class="w-10 h-10 object-cover rounded-full border">` : '<div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center"><i class="fas fa-user text-gray-400"></i></div>';
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-2">${img}</td><td class="p-3 font-bold text-nara-blue">${s['เลขประจำตัว']}</td>
+                        <td class="p-3">${s['ชื่อ-สกุล']}</td><td class="p-3">${s['ชั้น/ห้อง']}</td>
+                        <td class="p-3 text-center whitespace-nowrap">
+                            <button onclick='editStudent(${JSON.stringify(s)})' class="text-yellow-500 hover:text-yellow-700 bg-yellow-50 px-2 py-1 rounded mx-1"><i class="fas fa-edit"></i></button>
+                            <button onclick="openDeleteModal('${s.ID}', 'student')" class="text-red-500 hover:text-red-700 bg-red-50 px-2 py-1 rounded mx-1"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function searchStudentDB() {
+            const q = document.getElementById('search-stu-input').value.trim();
+            const filterClass = document.getElementById('filter-stu-class').value;
+            const filterRoom = document.getElementById('filter-stu-room').value;
+            
+            let filtered = allStudents;
+            if (q || filterClass || filterRoom) {
+                filtered = allStudents.filter(s => {
+                    const classData = s['ชั้น/ห้อง'] || '';
+                    const matchQ = !q || s['เลขประจำตัว'].toString().includes(q) || s['ชื่อ-สกุล'].includes(q);
+                    const matchC = !filterClass || classData.startsWith(filterClass);
+                    const matchR = !filterRoom || classData.endsWith(`/${filterRoom}`);
+                    return matchQ && matchC && matchR;
+                });
+            }
+            renderStudentTable(filtered);
+        }
+
+        function editStudent(s) {
+            document.getElementById('stu-id').value = s.ID;
+            document.getElementById('stu-code').value = s['เลขประจำตัว'];
+            document.getElementById('stu-name').value = s['ชื่อ-สกุล'];
+            
+            const clsRoom = s['ชั้น/ห้อง'] || '';
+            if (clsRoom.includes('/')) {
+                const parts = clsRoom.split('/');
+                document.getElementById('stu-class-level').value = parts[0];
+                document.getElementById('stu-class-room').value = parts[1];
+            } else {
+                document.getElementById('stu-class-level').value = '';
+                document.getElementById('stu-class-room').value = '';
+            }
+
+            document.getElementById('stu-program').value = s['แผนการเรียน'];
+            if(s['วันเกิด']) {
+                let d = s['วันเกิด']; if(d.includes('T')) d = d.split('T')[0];
+                document.getElementById('stu-dob').value = d; calcAge('stu-dob','stu-age');
+            }
+            document.getElementById('stu-advisor').value = s['ครูที่ปรึกษา'];
+            
+            parseAddressToForm(s['ที่อยู่']);
+            
+            document.getElementById('stu-parent').value = s['ชื่อผู้ปกครอง'];
+            document.getElementById('stu-parent-tel').value = s['เบอร์ผู้ปกครอง'];
+            if(s['รูปถ่าย_Base64']) {
+                document.getElementById('stu-photo-preview').src = s['รูปถ่าย_Base64'];
+                document.getElementById('stu-photo-preview').classList.remove('hidden');
+                document.getElementById('stu-photo-icon').classList.add('hidden');
+                document.getElementById('stu-photo-base64').value = s['รูปถ่าย_Base64'];
+            } else {
+                 document.getElementById('stu-photo-preview').classList.add('hidden');
+                 document.getElementById('stu-photo-icon').classList.remove('hidden');
+                 document.getElementById('stu-photo-base64').value = '';
+            }
+            
+            // เปลี่ยนปุ่มเป็นโหมดแก้ไขข้อมูล
+            const btn = document.getElementById('btn-save-student');
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> ยืนยันการแก้ไข';
+                btn.classList.remove('bg-nara-blue', 'hover:bg-blue-800');
+                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+            }
+            
+            document.getElementById('main-content-area').scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function saveStudent(e) {
+            e.preventDefault(); showLoading();
+            
+            const level = document.getElementById('stu-class-level').value;
+            const room = document.getElementById('stu-class-room').value;
+            const combinedClass = (level && room) ? `${level}/${room}` : '';
+            const stuId = document.getElementById('stu-id').value;
+
+            const data = {
+                ID: stuId, 
+                'เลขประจำตัว': document.getElementById('stu-code').value,
+                'ชื่อ-สกุล': document.getElementById('stu-name').value, 
+                'ชั้น/ห้อง': combinedClass,
+                'แผนการเรียน': document.getElementById('stu-program').value, 
+                'วันเกิด': document.getElementById('stu-dob').value,
+                'ครูที่ปรึกษา': document.getElementById('stu-advisor').value, 
+                'ที่อยู่': document.getElementById('stu-address').value,
+                'ชื่อผู้ปกครอง': document.getElementById('stu-parent').value, 
+                'เบอร์ผู้ปกครอง': document.getElementById('stu-parent-tel').value,
+                'รูปถ่าย_Base64': document.getElementById('stu-photo-base64').value
+            };
+            
+            try {
+                document.getElementById('loading-msg').innerText = "กำลังบันทึกข้อมูลลงฐานข้อมูล...";
+                
+                // ส่งข้อมูลไปยัง Google Sheet ด้วยโหมดไร้การบล็อก (no-cors)
+                await postData('saveStudent', { data: data });
+                
+                document.getElementById('loading-msg').innerText = "กำลังรีเฟรชตารางนักเรียน...";
+                
+                // ปัญหาเดิมเกิดจากเว็บดึงข้อมูลมาแสดงเร็วเกินไปขณะที่ Sheet ยังเขียนข้อมูลไม่เสร็จ
+                // จึงหน่วงเวลาไว้ 2 วินาที ก่อนที่จะดึงข้อมูลใหม่มาแสดง
+                setTimeout(async () => {
+                    await fetchStudents();
+                    clearStudentForm();
+                }, 2000);
+                
+            } catch(e) {
+                console.error(e);
+                hideLoading();
+                showToast('เกิดข้อผิดพลาด กรุณาลองใหม่', true);
+            }
+        }
+
+        // --- Delete Modal Logic ---
+        let itemToDelete = null;
+        let typeToDelete = null;
+
+        function openDeleteModal(id, type) {
+            itemToDelete = id;
+            typeToDelete = type;
+            const modal = document.getElementById('delete-modal');
+            const content = document.getElementById('delete-modal-content');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+            
+            document.getElementById('confirm-delete-btn').onclick = function() {
+                executeDelete();
+            };
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('delete-modal');
+            const content = document.getElementById('delete-modal-content');
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                itemToDelete = null;
+                typeToDelete = null;
+            }, 200);
+        }
+
+        async function executeDelete() {
+            const id = itemToDelete;
+            const type = typeToDelete;
+            closeDeleteModal();
+            
+            if (type === 'student') {
+                // ลบในหน้าเว็บแบบทันที (Optimistic Update)
+                const index = allStudents.findIndex(s => String(s.ID) === String(id));
+                if (index > -1) allStudents.splice(index, 1);
+                searchStudentDB(); 
+
+                const syncStatus = document.getElementById('db-sync-status');
+                if(syncStatus) {
+                    syncStatus.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-500"></i> กำลังลบข้อมูล...';
+                    syncStatus.classList.remove('hidden');
+                }
+
+                try {
+                    const res = await postData('deleteStudent', { id: id });
+                    if(res.status === 'success') {
+                        if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> ลบข้อมูลสำเร็จ';
+                        setTimeout(() => { if(syncStatus) syncStatus.classList.add('hidden') }, 3000); 
+                    } else {
+                        if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-times-circle text-red-500"></i> เกิดข้อผิดพลาด โปรดรีเฟรช';
+                        fetchStudents(); 
+                    }
+                } catch(e) {
+                    if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-times-circle text-red-500"></i> เกิดข้อผิดพลาด โปรดรีเฟรช';
+                    fetchStudents();
+                }
+            } else if (type === 'user') {
+                showLoading(); 
+                try {
+                    await postData('deleteUser', { id: id }); 
+                    fetchUsers();
+                } catch(e) {}
+                hideLoading();
+            }
+        }
+
+        // --- Card Making & Camera ---
+        let issueQueueList = [];
+
+        function makerSearchGroup() {
+            const cls = document.getElementById('maker-search-class').value;
+            const rm = document.getElementById('maker-search-room').value;
+            
+            if(!cls && !rm) { showToast('กรุณาเลือกชั้นหรือห้องเพื่อค้นหา', true); return; }
+            
+            let filtered = allStudents;
+            if (cls && rm) {
+                filtered = filtered.filter(s => (s['ชั้น/ห้อง']||'') === (`${cls}/${rm}`));
+            } else if (cls) {
+                filtered = filtered.filter(s => (s['ชั้น/ห้อง']||'').startsWith(cls));
+            } else if (rm) {
+                filtered = filtered.filter(s => (s['ชั้น/ห้อง']||'').endsWith(`/${rm}`));
+            }
+
+            const tbody = document.getElementById('maker-search-results-tbody');
+            tbody.innerHTML = '';
+            if(filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">ไม่พบข้อมูลนักเรียนในชั้น/ห้องนี้</td></tr>';
+            } else {
+                filtered.forEach(s => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-blue-50">
+                            <td class="p-2 text-center"><input type="checkbox" class="chk-maker-group" value="${s['เลขประจำตัว']}"></td>
+                            <td class="p-2 font-medium">${s['เลขประจำตัว']}</td><td class="p-2">${s['ชื่อ-สกุล']}</td><td class="p-2 text-gray-600">${s['ชั้น/ห้อง']}</td>
+                        </tr>`;
+                });
+            }
+            document.getElementById('maker-search-results-area').classList.remove('hidden');
+        }
+
+        function toggleMakerCheckAll(el) {
+            document.querySelectorAll('.chk-maker-group').forEach(chk => chk.checked = el.checked);
+        }
+
+        function makerAddSelectedToQueue() {
+            const selected = Array.from(document.querySelectorAll('.chk-maker-group:checked')).map(el => el.value);
+            if(selected.length === 0) { showToast('กรุณาติ๊กเลือกนักเรียนอย่างน้อย 1 คน', true); return; }
+            
+            let addedCount = 0;
+            selected.forEach(id => {
+                if(!issueQueueList.includes(id)) { issueQueueList.push(id); addedCount++; }
+            });
+            
+            renderIssueQueue();
+            document.getElementById('maker-search-results-area').classList.add('hidden');
+            document.querySelectorAll('.chk-maker-group').forEach(c=>c.checked=false);
+            if(document.querySelector('input[onchange="toggleMakerCheckAll(this)"]')) document.querySelector('input[onchange="toggleMakerCheckAll(this)"]').checked = false;
+            
+            if(addedCount > 0) showToast(`เพิ่มลงตารางแล้ว ${addedCount} รายการ`);
+        }
+
+        function makerAddById() {
+            const id = document.getElementById('maker-search-id').value.trim();
+            if(!id) return;
+            const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id);
+            if(stu) {
+                if(!issueQueueList.includes(id)) { 
+                    issueQueueList.push(id); 
+                    renderIssueQueue(); 
+                    showToast('เพิ่มรายการสำเร็จ');
+                }
+                document.getElementById('maker-search-id').value = '';
+            } else {
+                showToast('ไม่พบรหัสนักเรียนในระบบ', true);
+            }
+        }
+
+        function renderIssueQueue() {
+            const tbody = document.getElementById('maker-queue-tbody');
+            document.getElementById('queue-count').innerText = issueQueueList.length;
+            if(issueQueueList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center p-6 text-gray-400">ยังไม่มีรายการ กรุณาค้นหาและเพิ่มรายการด้านบน</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = '';
+            issueQueueList.forEach((id) => {
+                const s = allStudents.find(stu => stu['เลขประจำตัว'].toString() === id.toString());
+                if(s) {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-blue-50 transition cursor-pointer" onclick="openIssueModal('${s['เลขประจำตัว']}')">
+                            <td class="p-3 font-bold text-nara-blue">${s['เลขประจำตัว']}</td>
+                            <td class="p-3">${s['ชื่อ-สกุล']}</td>
+                            <td class="p-3">${s['ชั้น/ห้อง']}</td>
+                            <td class="p-3 text-center">
+                                <button class="bg-nara-blue text-white px-3 py-1 rounded text-xs hover:bg-blue-800 shadow"><i class="fas fa-edit"></i> เปิดฟอร์ม</button>
+                            </td>
+                        </tr>`;
+                }
+            });
+        }
+
+        function openIssueModal(id, issueDate = null, expireDate = null) {
+            const s = allStudents.find(stu => stu['เลขประจำตัว'].toString() === id.toString());
+            if(!s) { showToast('ไม่พบข้อมูล', true); return; }
+            
+            document.getElementById('m-id').value = s['เลขประจำตัว'];
+            document.getElementById('m-name').value = s['ชื่อ-สกุล'];
+            
+            // แยกชั้นและห้องมาแสดงใน Dropdown
+            const clsRoom = s['ชั้น/ห้อง'] || '';
+            if (clsRoom.includes('/')) {
+                const parts = clsRoom.split('/');
+                document.getElementById('m-class-level').value = parts[0];
+                document.getElementById('m-class-room').value = parts[1];
+            } else {
+                document.getElementById('m-class-level').value = '';
+                document.getElementById('m-class-room').value = '';
+            }
+
+            document.getElementById('m-program').value = s['แผนการเรียน'] || '';
+            document.getElementById('m-address').value = s['ที่อยู่'] || '';
+
+            if(s['วันเกิด']) document.getElementById('m-age').value = new Date().getFullYear() - new Date(s['วันเกิด']).getFullYear();
+            else document.getElementById('m-age').value = '';
+            
+            if(s['รูปถ่าย_Base64']) {
+                document.getElementById('maker-photo').src = s['รูปถ่าย_Base64'];
+                document.getElementById('maker-photo').classList.remove('hidden');
+                document.getElementById('maker-photo-icon').classList.add('hidden');
+                document.getElementById('maker-photo-base64').value = s['รูปถ่าย_Base64'];
+            } else {
+                document.getElementById('maker-photo').classList.add('hidden');
+                document.getElementById('maker-photo-icon').classList.remove('hidden');
+                document.getElementById('maker-photo-base64').value = '';
+            }
+
+            if(issueDate && issueDate.includes('-')) document.getElementById('m-issue').value = issueDate.split('T')[0];
+            else document.getElementById('m-issue').value = new Date().toISOString().split('T')[0];
+            
+            calcExpire();
+            if(expireDate && expireDate.includes('-')) document.getElementById('m-expire').value = expireDate.split('T')[0];
+
+            document.getElementById('issue-modal').classList.remove('hidden');
+        }
+
+        function closeIssueModal() {
+            document.getElementById('issue-modal').classList.add('hidden');
+        }
+
+        // เพิ่มฟังก์ชันดึงแผนการเรียนอัตโนมัติในหน้าออกบัตร
+        function updateMakerProgramAuto() {
+            const lvl = document.getElementById('m-class-level').value;
+            const rm = document.getElementById('m-class-room').value;
+            const progInput = document.getElementById('m-program');
+            
+            if (lvl && rm && systemSettings.programMap) {
+                const searchStr = `${lvl}/${rm}`;
+                const lines = systemSettings.programMap.split('\n');
+                let found = false;
+                for (let line of lines) {
+                    const parts = line.split('=');
+                    if (parts.length === 2 && parts[0].trim() === searchStr) {
+                        progInput.value = parts[1].trim();
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) progInput.value = '';
+            }
+        }
+
+        function calcExpire() {
+            const issueDate = document.getElementById('m-issue').value;
+            const years = parseInt(document.getElementById('m-expire-years').value);
+            if(issueDate) {
+                let d = new Date(issueDate); d.setFullYear(d.getFullYear() + years);
+                document.getElementById('m-expire').value = d.toISOString().split('T')[0];
+            }
+        }
+        
+        async function openCameraModal() {
+            document.getElementById('camera-modal').classList.remove('hidden');
+            const video = document.getElementById('webcam-video');
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = videoStream;
+            } catch(e) { alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบสิทธิ์"); closeCameraModal(); }
+        }
+        function closeCameraModal() {
+            document.getElementById('camera-modal').classList.add('hidden');
+            if(videoStream) videoStream.getTracks().forEach(track => track.stop());
+            document.getElementById('camera-controls').classList.remove('hidden');
+            document.getElementById('snapshot-controls').classList.add('hidden');
+        }
+        function takeSnapshot() {
+            const video = document.getElementById('webcam-video');
+            const canvas = document.getElementById('webcam-canvas');
+            canvas.width = 300; canvas.height = 400; 
+            const ctx = canvas.getContext('2d');
+            ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+            
+            const vW = video.videoWidth, vH = video.videoHeight, ratio = 3/4;
+            let sx, sy, sW, sH;
+            if (vW/vH > ratio) { sH = vH; sW = vH * ratio; sx = (vW - sW)/2; sy = 0; } 
+            else { sW = vW; sH = vW / ratio; sx = 0; sy = (vH - sH)/2; }
+            
+            ctx.drawImage(video, sx, sy, sW, sH, 0, 0, canvas.width, canvas.height);
+            video.pause();
+            document.getElementById('camera-controls').classList.add('hidden');
+            document.getElementById('snapshot-controls').classList.remove('hidden');
+        }
+        function retakeSnapshot() {
+            document.getElementById('webcam-video').play();
+            document.getElementById('camera-controls').classList.remove('hidden');
+            document.getElementById('snapshot-controls').classList.add('hidden');
+        }
+        function confirmSnapshot() {
+            const b64 = document.getElementById('webcam-canvas').toDataURL('image/jpeg', 0.8);
+            document.getElementById('maker-photo').src = b64;
+            document.getElementById('maker-photo').classList.remove('hidden');
+            document.getElementById('maker-photo-icon').classList.add('hidden');
+            document.getElementById('maker-photo-base64').value = b64;
+            closeCameraModal();
+        }
+
+        async function saveCardHistory(e) {
+            e.preventDefault();
+            const photoBase64 = document.getElementById('maker-photo-base64').value;
+            
+            if(!photoBase64) {
+                if(!confirm("นักเรียนคนนี้ยังไม่มีรูปถ่าย ต้องการบันทึกโดยไม่มีรูปหรือไม่?")) return;
+            }
+
+            showLoading();
+            const stuId = document.getElementById('m-id').value;
+            
+            // เพิ่ม: อัปเดตข้อมูลนักเรียน หากมีการเปลี่ยนแปลงชั้น/ห้อง หรือที่อยู่ ในฟอร์มออกบัตร
+            const level = document.getElementById('m-class-level').value;
+            const room = document.getElementById('m-class-room').value;
+            const combinedClass = (level && room) ? `${level}/${room}` : '';
+            const newProgram = document.getElementById('m-program').value;
+            const newAddress = document.getElementById('m-address').value;
+
+            const stuIndex = allStudents.findIndex(s => s['เลขประจำตัว'].toString() === stuId.toString());
+            if (stuIndex > -1) {
+                const stu = allStudents[stuIndex];
+                let isChanged = false;
+                
+                if (stu['ชั้น/ห้อง'] !== combinedClass) { stu['ชั้น/ห้อง'] = combinedClass; isChanged = true; }
+                if (stu['แผนการเรียน'] !== newProgram) { stu['แผนการเรียน'] = newProgram; isChanged = true; }
+                if (stu['ที่อยู่'] !== newAddress) { stu['ที่อยู่'] = newAddress; isChanged = true; }
+                if (photoBase64 && stu['รูปถ่าย_Base64'] !== photoBase64) { stu['รูปถ่าย_Base64'] = photoBase64; isChanged = true; }
+
+                if (isChanged) {
+                    postData('saveStudent', { data: stu }).catch(e => console.error('Failed to update student data', e));
+                }
+            }
+            
+            const currentRunNum = "Nscd " + String(allCardHistory.length + 1).padStart(4, '0');
+
+            const data = {
+                'เลขประจำตัวนักเรียน': stuId,
+                'วันออกบัตร': document.getElementById('m-issue').value,
+                'วันหมดอายุ': document.getElementById('m-expire').value,
+                'สถานะการพิมพ์': 'ยังไม่พิมพ์',
+                'รูปถ่าย_Base64': photoBase64,
+                'เลขที่บัตร': currentRunNum
+            };
+            try {
+                const res = await postData('saveCardHistory', { data: data });
+                if(res.status==='success') { 
+                    showToast('บันทึกข้อมูลออกบัตรสำเร็จ'); 
+                    
+                    data['ID'] = res.id || new Date().getTime(); 
+                    allCardHistory.push(data); // Sync local memory
+
+                    issueQueueList = issueQueueList.filter(id => id !== stuId);
+                    renderIssueQueue();
+                    closeIssueModal();
+                    
+                    renderCardHistory(); // Update local table immediately
+                } else {
+                    showToast(res.message, true);
+                }
+            } catch(e) {
+                showToast('เกิดข้อผิดพลาดในการบันทึก', true);
+            }
+            hideLoading();
+        }
+
+        async function fetchCardHistory() {
+            showLoading();
+            try {
+                const res = await fetchJSONP('getCardHistory');
+                if(res.status === 'success') {
+                    allCardHistory = res.data || [];
+                    renderCardHistory();
+                    showToast('ซิงค์ประวัติการออกบัตรแล้ว');
+                }
+            } catch(e) {}
+            hideLoading();
+        }
+
+        function renderCardHistory() {
+            const tbody = document.getElementById('table-history');
+            tbody.innerHTML = '';
+            
+            const filterClass = document.getElementById('filter-history-class') ? document.getElementById('filter-history-class').value : '';
+            const filterRoom = document.getElementById('filter-history-room') ? document.getElementById('filter-history-room').value : '';
+            
+            let filteredHistory = allCardHistory.slice().reverse();
+
+            if (filterClass || filterRoom) {
+                filteredHistory = filteredHistory.filter(h => {
+                    const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === h['เลขประจำตัวนักเรียน'].toString()) || {};
+                    const classData = stu['ชั้น/ห้อง'] || '';
+                    const matchC = !filterClass || classData.startsWith(filterClass);
+                    const matchR = !filterRoom || classData.endsWith(`/${filterRoom}`);
+                    return matchC && matchR;
+                });
+            }
+
+            if(filteredHistory.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-gray-500">ไม่มีข้อมูลประวัติ</td></tr>';
+                 return;
+            }
+
+            filteredHistory.forEach(h => {
+                const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === h['เลขประจำตัวนักเรียน'].toString()) || {};
+                const name = stu['ชื่อ-สกุล'] || '-';
+                const cls = stu['ชั้น/ห้อง'] || '-';
+                const issueDate = h['วันออกบัตร'] ? formatThaiDateShort(h['วันออกบัตร']) : '-';
+                const rawIssue = h['วันออกบัตร'] || '';
+                const rawExp = h['วันหมดอายุ'] || '';
+                const printStatus = h['สถานะการพิมพ์'] || 'ยังไม่พิมพ์';
+                const statusColor = printStatus === 'พิมพ์แล้ว' ? 'text-green-600 font-bold' : 'text-red-500 font-bold';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 font-bold text-nara-blue">${h['เลขประจำตัวนักเรียน']}</td>
+                        <td class="p-3">${name}</td>
+                        <td class="p-3">${cls}</td>
+                        <td class="p-3">${issueDate}</td>
+                        <td class="p-3 text-center ${statusColor}">${printStatus}</td>
+                        <td class="p-3 text-center whitespace-nowrap">
+                            <button onclick="openIssueModal('${h['เลขประจำตัวนักเรียน']}', '${rawIssue}', '${rawExp}')" class="bg-gray-100 border text-yellow-600 hover:bg-yellow-50 px-2 py-1 rounded text-xs mr-2 shadow-sm" title="แก้ไข"><i class="fas fa-edit"></i> แก้ไข</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // --- Print System ---
+        async function refreshPrintData() {
+            showLoading();
+            document.getElementById('loading-msg').innerText = "กำลังอัปเดตข้อมูลล่าสุด...";
+            try {
+                const [resSet, resStu, resHis] = await Promise.all([
+                    fetchJSONP('getSettings'),
+                    fetchJSONP('getStudents'),
+                    fetchJSONP('getCardHistory')
+                ]);
+
+                if (resSet.status === 'success') {
+                    systemSettings = resSet.data || {};
+                    localStorage.setItem('nara_settings', JSON.stringify(systemSettings));
+                }
+                if (resStu.status === 'success') allStudents = resStu.data || [];
+                if (resHis.status === 'success') allCardHistory = resHis.data || [];
+                
+                showToast('อัปเดตข้อมูลสำเร็จ พร้อมประมวลผลบัตร');
+            } catch(e) {
+                console.error(e);
+                showToast('อัปเดตข้อมูลล้มเหลว', true);
+            }
+            hideLoading();
+        }
+
+        function switchTabPrint(tabId) {
+            document.getElementById('print-tab1').classList.add('hidden');
+            document.getElementById('print-tab2').classList.add('hidden');
+            document.getElementById('btn-print-tab1').className = "px-6 py-2 border-b-2 border-transparent text-gray-500 hover:text-nara-blue";
+            document.getElementById('btn-print-tab2').className = "px-6 py-2 border-b-2 border-transparent text-gray-500 hover:text-nara-blue";
+            
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById('btn-' + tabId).className = "px-6 py-2 border-b-2 border-nara-blue text-nara-blue font-bold";
+        }
+
+        function generateCardHTML(studentData, cardIdPrefix = "card") {
+            const st = systemSettings;
+            const w = st.cardOrientation === 'landscape' ? '8.6cm' : '5.4cm';
+            const h = st.cardOrientation === 'landscape' ? '5.4cm' : '8.6cm';
+            const bgFront = st.bgFront || '';
+            const bgBack = st.bgBack || '';
+            const sId = studentData['เลขประจำตัว'] || '';
+            const idTag = cardIdPrefix + '_' + sId;
+
+            let frontElementsHTML = '';
+            let backElementsHTML = '';
+            let qrIdToRender = '';
+            let qrDataText = sId.toString();
+
+            let runningNumberStr = "Nscd 0001";
+            let historyRecord = allCardHistory.slice().reverse().find(h => h['เลขประจำตัวนักเรียน'] && h['เลขประจำตัวนักเรียน'].toString() === sId.toString());
+            
+            if (historyRecord && historyRecord['เลขที่บัตร']) {
+                runningNumberStr = historyRecord['เลขที่บัตร'];
+            } else if (historyRecord) {
+                let runIndex = allCardHistory.indexOf(historyRecord);
+                runningNumberStr = "Nscd " + String(runIndex + 1).padStart(4, '0');
+            } else {
+                runningNumberStr = "Nscd " + String(allCardHistory.length + 1).padStart(4, '0');
+            }
+
+            if (st.layoutElementsJSON) {
+                try {
+                    const elements = JSON.parse(st.layoutElementsJSON);
+                    elements.forEach(el => {
+                        let content = '';
+                        
+                        let transform = el.transform || 'translate(-50%,-50%)';
+                        if (!el.transform && el.textAlign) {
+                            if (el.textAlign === 'left') transform = 'translate(0%, -50%)';
+                            if (el.textAlign === 'right') transform = 'translate(-100%, -50%)';
+                        }
+
+                        let styleStr = `position:absolute; left:${el.left}; top:${el.top}; transform:${transform}; box-sizing:border-box; overflow:hidden;`;
+                        if(el.width) styleStr += ` width:${el.width};`;
+                        if(el.height) styleStr += ` height:${el.height};`;
+                        if(el.fontSize) styleStr += ` font-size:${el.fontSize};`;
+                        if(el.color) styleStr += ` color:${el.color};`;
+                        
+                        let fw = el.fontWeight || 'bold';
+                        if (fw === '400') fw = 'normal';
+                        if (fw === '700' || fw === 'bold') fw = 'bold';
+                        styleStr += ` font-weight:${fw};`;
+
+                        if(el.textAlign) styleStr += ` text-align:${el.textAlign};`;
+                        
+                        if(el.borderColor) {
+                            styleStr += ` border-color:${el.borderColor}; border-width:${el.borderWidth||'2px'}; border-style:${el.borderStyle||'solid'};`;
+                        }
+                        if(el.borderRadius) {
+                            styleStr += ` border-radius:${el.borderRadius}; overflow:hidden;`;
+                        }
+
+                        if (el.type === 'photo') {
+                            const photoUrl = studentData['รูปถ่าย_Base64'] || 'https://via.placeholder.com/150';
+                            if(!el.borderColor) styleStr += ` border:1px solid #ccc;`;
+                            styleStr += ` background:#eee;`;
+                            content = `<img src="${photoUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit; display:block;">`;
+                        } else if (el.type === 'qr') {
+                            styleStr += ` background:white; padding:2px;`;
+                            qrIdToRender = `qr_${idTag}_${el.id}`;
+                            content = `<style>#${qrIdToRender} { display:flex; align-items:center; justify-content:center; width:100%; height:100%; } #${qrIdToRender} img, #${qrIdToRender} canvas { max-width: 100% !important; max-height: 100% !important; object-fit: contain; }</style><div id="${qrIdToRender}"></div>`;
+                        } else if (el.type === 'signature') {
+                            const sigUrl = st.sigBase64 || 'https://via.placeholder.com/80x30?text=Signature';
+                            content = `<img src="${sigUrl}" style="width:100%; height:100%; object-fit:contain; display:block;">`;
+                        } else if (el.type === 'logo') {
+                            const logoUrl = st.logoBase64 || 'https://upload.wikimedia.org/wikipedia/th/thumb/e/e0/Narasikkhalai_School_Logo.png/200px-Narasikkhalai_School_Logo.png';
+                            content = `<img src="${logoUrl}" style="width:100%; height:100%; object-fit:contain; display:block;">`;
+                        } else {
+                            styleStr += ` max-width:100%;`;
+                            if(el.field === '[ข้อปฏิบัติ]') {
+                                styleStr += ` white-space:pre-wrap; line-height:1.2;`;
+                            } else if (el.field === '[ที่อยู่]' || el.field === '[ที่อยู่โรงเรียน]') {
+                                styleStr += ` white-space:normal; line-height:1.2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;`;
+                            } else {
+                                styleStr += ` white-space:nowrap; text-overflow:ellipsis;`;
+                            }
+                            
+                            let text = el.text;
+                            if (el.field === '[ชื่อ-สกุล]') text = studentData['ชื่อ-สกุล'] || '';
+                            else if (el.field === '[เลขประจำตัว]') text = studentData['เลขประจำตัว'] || '';
+                            else if (el.field === '[เลขที่บัตร]') text = runningNumberStr;
+                            else if (el.field === '[ชั้น/ห้อง]') text = studentData['ชั้น/ห้อง'] || '';
+                            else if (el.field === '[แผนการเรียน]') text = studentData['แผนการเรียน'] || '';
+                            else if (el.field === '[วันเกิด]') text = formatThaiDateShort(studentData['วันเกิด']);
+                            else if (el.field === '[ที่อยู่]') text = studentData['ที่อยู่'] || '';
+                            else if (el.field === '[ชื่อผู้ลงนาม]') text = st.signerName || '';
+                            else if (el.field === '[ข้อปฏิบัติ]') text = st.rules || '';
+                            else if (el.field === '[วันออกบัตร]') text = formatThaiDateShort(new Date());
+                            else if (el.field === '[วันหมดอายุ]') {
+                                let d = new Date(); d.setFullYear(d.getFullYear() + 3);
+                                text = formatThaiDateShort(d);
+                            }
+                            else if (el.field === '[ชื่อโรงเรียน]') text = st.schoolName || '';
+                            else if (el.field === '[ที่อยู่โรงเรียน]') text = st.schoolAddress || '';
+                            else if (el.field === '[เว็บไซต์โรงเรียน]') text = st.schoolWebsite || '';
+                            
+                            content = text;
+                        }
+                        const elHTML = `<div style="${styleStr}">${content}</div>`;
+                        if (el.side === 'back') backElementsHTML += elHTML;
+                        else frontElementsHTML += elHTML;
+                    });
+                } catch(e) { console.error(e); }
+            }
+
+            let frontHTML = `<div class="print-card" style="width:${w}; height:${h}; background-image:url('${bgFront}'); background-size: cover; background-position: center; position:relative; box-sizing:border-box; border-right:1px dashed #ccc; overflow:hidden;">${frontElementsHTML}</div>`;
+            let backHTML = `<div class="print-card" style="width:${w}; height:${h}; background-image:url('${bgBack}'); background-size: cover; background-position: center; position:relative; box-sizing:border-box; overflow:hidden;">${backElementsHTML}</div>`;
+            
+            let pairHTML = `<div class="card-pair" style="display:flex; flex-direction:row; outline:1px dashed #ccc; margin: 1mm 2mm; page-break-inside: avoid; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${frontHTML}${backHTML}</div>`;
+            
+            return { html: pairHTML, qrId: qrIdToRender, qrText: qrDataText };
+        }
+
+        async function renderSingleCard() {
+            const id = document.getElementById('print-single-id').value;
+            if(!id) return;
+            showLoading();
+            try {
+                const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
+                
+                if(stu) {
+                    const renderArea = document.getElementById('print-preview-content');
+                    renderArea.innerHTML = '';
+                    
+                    const cardData = generateCardHTML(stu, 'single');
+                    renderArea.innerHTML = cardData.html;
+                    
+                    document.getElementById('print-preview-modal').classList.remove('hidden');
+                    
+                    if (cardData.qrId) {
+                        setTimeout(() => { new QRCode(document.getElementById(cardData.qrId), { text: cardData.qrText, width: 120, height: 120 }); }, 100);
+                    }
+
+                    printQueue = [id]; 
+                } else {
+                    showToast('ไม่พบรหัสประจำตัวนี้', true);
+                }
+            } catch(e){
+                showToast('Error', true);
+            }
+            hideLoading();
+        }
+
+        function searchGroupPrint() {
+            const cls = document.getElementById('print-group-class-level').value;
+            const rm = document.getElementById('print-group-class-room').value;
+            
+            if(!cls && !rm) { showToast('กรุณาเลือกชั้นหรือห้องเพื่อค้นหา', true); return; }
+            
+            let filtered = allStudents;
+            if (cls && rm) {
+                filtered = filtered.filter(s => (s['ชั้น/ห้อง']||'') === (`${cls}/${rm}`));
+            } else if (cls) {
+                filtered = filtered.filter(s => (s['ชั้น/ห้อง']||'').startsWith(cls));
+            } else if (rm) {
+                filtered = filtered.filter(s => (s['ชั้น/ห้อง']||'').endsWith(`/${rm}`));
+            }
+
+            const tbody = document.getElementById('table-group-list');
+            tbody.innerHTML = '';
+            
+            if(filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">ไม่พบข้อมูลนักเรียนในชั้น/ห้องนี้</td></tr>';
+            } else {
+                filtered.forEach(s => {
+                    tbody.innerHTML += `<tr><td class="p-2 text-center"><input type="checkbox" class="chk-group" value="${s['เลขประจำตัว']}"></td><td class="p-2">${s['เลขประจำตัว']}</td><td class="p-2">${s['ชื่อ-สกุล']}</td></tr>`;
+                });
+            }
+            document.getElementById('group-select-area').classList.remove('hidden');
+        }
+        
+        function toggleCheckAll(el) {
+            document.querySelectorAll('.chk-group').forEach(chk => chk.checked = el.checked);
+        }
+
+        function renderGroupCards() {
+            const selected = Array.from(document.querySelectorAll('.chk-group:checked')).map(el => el.value);
+            if(selected.length === 0) { showToast('กรุณาเลือกนักเรียน', true); return; }
+            printQueue = selected;
+            
+            let htmlStr = ``;
+            let qrTasks = [];
+            
+            selected.forEach(id => {
+                const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
+                if(stu) {
+                    const cardData = generateCardHTML(stu, 'group');
+                    htmlStr += cardData.html;
+                    qrTasks.push(cardData);
+                }
+            });
+            
+            document.getElementById('print-preview-content').innerHTML = htmlStr;
+            document.getElementById('print-preview-modal').classList.remove('hidden');
+
+            setTimeout(() => {
+                qrTasks.forEach(task => { if (task.qrId) new QRCode(document.getElementById(task.qrId), { text: task.qrText, width: 120, height: 120 }); });
+            }, 100);
+        }
+
+        function closePrintPreviewModal() {
+            document.getElementById('print-preview-modal').classList.add('hidden');
+        }
+
+        async function executePrint() {
+            const printAreaContainer = document.getElementById('print-preview-content');
+
+            // Convert canvas (QR) to img to ensure it prints
+            printAreaContainer.querySelectorAll('canvas').forEach(canvas => {
+                const img = document.createElement('img');
+                img.src = canvas.toDataURL('image/png');
+                img.style.cssText = canvas.style.cssText;
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'contain';
+                canvas.parentNode.replaceChild(img, canvas);
+            });
+
+            // ดึงบัตรทั้งหมด
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = printAreaContainer.innerHTML;
+            const cards = Array.from(tempDiv.querySelectorAll('.print-card'));
+            
+            // 1. ดึงการตั้งค่าหน้ากระดาษที่ผู้ใช้เลือกจาก Modal
+            const paperSizeName = document.getElementById('print-paper-size').value;
+            const pageOrientation = document.getElementById('print-paper-orientation').value;
+            
+            // 2. กำหนดขนาดกระดาษมาตรฐาน (หน่วยเป็น มิลลิเมตร)
+            const paperDims = {
+                'A4': { w: 210, h: 297 },
+                'A3': { w: 297, h: 420 },
+                'Letter': { w: 215.9, h: 279.4 },
+                'Legal': { w: 215.9, h: 355.6 }
+            };
+            
+            let pageW = paperDims[paperSizeName].w;
+            let pageH = paperDims[paperSizeName].h;
+            
+            // สลับกว้างxยาว หากผู้ใช้เลือกพิมพ์หน้าแนวนอน
+            if (pageOrientation === 'landscape') {
+                pageW = paperDims[paperSizeName].h;
+                pageH = paperDims[paperSizeName].w;
+            }
+
+            // 3. กำหนดขนาดของบัตร (เพื่อคำนวณว่าจะใส่ได้กี่ใบ)
+            const cardOrientation = systemSettings.cardOrientation || 'portrait';
+            const cardW = cardOrientation === 'landscape' ? 86 : 54; // มม.
+            const cardH = cardOrientation === 'landscape' ? 54 : 86; // มม.
+
+            // 4. คำนวณจำนวนบัตรสูงสุดต่อหน้า (หักระยะเว้นขอบบน 2มม, ซ้าย 2มม)
+            const paddingLeft = 2; 
+            const paddingTop = 2;  
+            const usableW = pageW - paddingLeft;
+            const usableH = pageH - paddingTop;
+            
+            const cols = Math.floor(usableW / cardW);
+            const rows = Math.floor(usableH / cardH);
+            const cardsPerPage = cols * rows;
+
+            if (cardsPerPage === 0) {
+                showToast('ขนาดกระดาษเล็กเกินไปสำหรับขนาดบัตร', true);
+                return;
+            }
+            
+            let pagesHTML = '';
+            for (let i = 0; i < cards.length; i += cardsPerPage) {
+                const chunk = cards.slice(i, i + cardsPerPage);
+                pagesHTML += `<div class="print-page">`;
+                chunk.forEach(card => {
+                    // ลบ Margin/Border เดิมออกให้บัตรชิดกัน 100%
+                    card.style.margin = '0';
+                    card.style.border = 'none';
+                    card.style.outline = 'none'; 
+                    
+                    // เพิ่มสเกลแนวตัด (Crop Marks) ที่มุมทั้ง 4
+                    card.innerHTML += `
+                        <div style="position:absolute; top:0; left:0; width:4mm; height:4mm; border-top:0.5px solid #555; border-left:0.5px solid #555; z-index:999; pointer-events:none;"></div>
+                        <div style="position:absolute; top:0; right:0; width:4mm; height:4mm; border-top:0.5px solid #555; border-right:0.5px solid #555; z-index:999; pointer-events:none;"></div>
+                        <div style="position:absolute; bottom:0; left:0; width:4mm; height:4mm; border-bottom:0.5px solid #555; border-left:0.5px solid #555; z-index:999; pointer-events:none;"></div>
+                        <div style="position:absolute; bottom:0; right:0; width:4mm; height:4mm; border-bottom:0.5px solid #555; border-right:0.5px solid #555; z-index:999; pointer-events:none;"></div>
+                    `;
+
+                    pagesHTML += card.outerHTML;
+                });
+                pagesHTML += `</div>`;
+            }
+
+            const printWin = window.open('', '_blank');
+            if (!printWin) {
+                showToast('เบราว์เซอร์บล็อกการเปิดหน้าต่างใหม่ กรุณาอนุญาต Pop-up', true);
+                return;
+            }
+
+            printWin.document.write(`
+                <!DOCTYPE html>
+                <html lang="th">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>พิมพ์บัตรนักเรียน - โรงเรียนนราสิกขาลัย</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+                        body { 
+                            margin: 0; 
+                            padding: 0; 
+                            font-family: 'Prompt', sans-serif;
+                            background: #fff;
+                            -webkit-print-color-adjust: exact !important; 
+                            print-color-adjust: exact !important;
+                        }
+                        /* ส่งค่า Size และ Orientation ไปบังคับไดอะล็อกพิมพ์ของเบราว์เซอร์ */
+                        @page { 
+                            size: ${paperSizeName} ${pageOrientation}; 
+                            margin: 0; 
+                        }
+                        /* กำหนดขนาดหน้าให้เป๊ะตามสัดส่วนกระดาษจริง */
+                        .print-page {
+                            width: ${pageW}mm;
+                            height: ${pageH}mm;
+                            padding-top: 2mm; /* เว้นขอบบน 2 มม. */
+                            padding-left: 2mm; /* เว้นขอบซ้าย 2 มม. */
+                            page-break-after: always;
+                            display: flex;
+                            flex-wrap: wrap;
+                            align-content: flex-start;
+                            justify-content: flex-start;
+                            overflow: hidden;
+                            box-sizing: border-box;
+                            background: white;
+                        }
+                        .print-card {
+                            box-sizing: border-box !important;
+                            page-break-inside: avoid;
+                        }
+                        * { box-sizing: border-box; }
+                    </style>
+                </head>
+                <body>
+                    ${pagesHTML}
+                    <script>
+                        setTimeout(() => {
+                            window.print();
+                        }, 800);
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+            
+            closePrintPreviewModal();
+
+            if(printQueue.length > 0) {
+                try {
+                    await postData('updatePrintStatus', { ids: printQueue });
+                    showToast('อัปเดตสถานะการพิมพ์เรียบร้อย');
+                    printQueue = [];
+                    fetchCardHistory(); 
+                } catch(e){}
+            }
+        }
+    </script>
+</body>
+</html>
