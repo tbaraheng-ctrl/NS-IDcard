@@ -62,10 +62,10 @@
 </head>
 <body class="text-gray-800">
 
-    <!-- Loading Overlay -->
-    <div id="loading" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex flex-col items-center justify-center hidden">
-        <i class="fas fa-circle-notch fa-spin text-nara-yellow text-5xl mb-4"></i>
-        <p id="loading-msg" class="text-white text-lg font-medium">กำลังประมวลผล...</p>
+    <!-- Loading Overlay (แบบทำงานเบื้องหลัง ไม่บังจอ) -->
+    <div id="loading" class="fixed bottom-5 left-5 z-50 bg-white border-l-4 border-nara-yellow px-4 py-3 rounded shadow-lg flex items-center gap-3 hidden transition-opacity duration-300 pointer-events-none">
+        <i class="fas fa-circle-notch fa-spin text-nara-blue text-xl"></i>
+        <p id="loading-msg" class="text-gray-700 text-sm font-bold">กำลังประมวลผล...</p>
     </div>
 
     <!-- Notification Toast -->
@@ -694,6 +694,10 @@
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                             <div class="flex flex-wrap items-center gap-3">
                                 <h3 class="font-bold text-gray-700 text-lg"><i class="fas fa-history"></i> ประวัติการออกบัตรล่าสุด</h3>
+                                
+                                <!-- เพิ่มช่องค้นหาเลขประจำตัวนักเรียน -->
+                                <input type="text" id="filter-history-id" placeholder="ค้นหาเลขประจำตัว..." class="p-1.5 border rounded text-sm shadow-sm bg-gray-50 w-36" onkeyup="renderCardHistory()">
+                                
                                 <select id="filter-history-class" class="p-1.5 border rounded text-sm shadow-sm bg-gray-50" onchange="renderCardHistory()">
                                     <option value="">ทุกชั้นเรียน</option>
                                     <option value="ม.1">ม.1</option><option value="ม.2">ม.2</option><option value="ม.3">ม.3</option>
@@ -1076,7 +1080,8 @@
 
         async function fetchAddressDBQuietly() {
             try {
-                const res = await fetchJSONP('getAddressDB');
+                // ขยายเวลา Timeout เป็น 60 วินาที สำหรับฐานข้อมูลที่อยู่
+                const res = await fetchJSONP('getAddressDB', {}, 60000);
                 if (res.status === 'success') {
                     localStorage.setItem('thai_address_db', JSON.stringify(res.data));
                     thaiAddressDB = res.data;
@@ -2168,7 +2173,8 @@
             showLoading();
             document.getElementById('loading-msg').innerText = "กำลังอัปเดตข้อมูลที่อยู่...";
             try {
-                const res = await fetchJSONP('getAddressDB');
+                // ขยายเวลา Timeout เป็น 60 วินาที สำหรับฐานข้อมูลที่อยู่เช่นกัน
+                const res = await fetchJSONP('getAddressDB', {}, 60000);
                 if (res.status === 'success') {
                     localStorage.setItem('thai_address_db', JSON.stringify(res.data));
                     thaiAddressDB = res.data;
@@ -2937,7 +2943,6 @@
         }
 
         async function fetchCardHistory() {
-            // ถอดหน้าจอดำ เปลี่ยนเป็น Toast
             showToast('กำลังซิงค์ข้อมูลประวัติเบื้องหลัง...');
             const btnIcon = document.querySelector('button[onclick="fetchCardHistory()"] i');
             if(btnIcon) btnIcon.classList.add('fa-spin');
@@ -2960,16 +2965,20 @@
             
             const filterClass = document.getElementById('filter-history-class') ? document.getElementById('filter-history-class').value : '';
             const filterRoom = document.getElementById('filter-history-room') ? document.getElementById('filter-history-room').value : '';
+            // เพิ่มการรองรับช่องค้นหาเลขประจำตัว (ที่เพิ่มใหม่)
+            const filterId = document.getElementById('filter-history-id') ? document.getElementById('filter-history-id').value.trim() : '';
             
             let filteredHistory = allCardHistory.slice().reverse();
 
-            if (filterClass || filterRoom) {
+            if (filterClass || filterRoom || filterId) {
                 filteredHistory = filteredHistory.filter(h => {
                     const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === h['เลขประจำตัวนักเรียน'].toString()) || {};
                     const classData = stu['ชั้น/ห้อง'] || '';
                     const matchC = !filterClass || classData.startsWith(filterClass);
                     const matchR = !filterRoom || classData.endsWith(`/${filterRoom}`);
-                    return matchC && matchR;
+                    // เช็คว่าไอดีตรงกันหรือไม่ (พิมพ์บางส่วนก็เจอ)
+                    const matchId = !filterId || h['เลขประจำตัวนักเรียน'].toString().includes(filterId);
+                    return matchC && matchR && matchId;
                 });
             }
 
@@ -3294,7 +3303,7 @@
         async function renderSingleCard() {
             const id = document.getElementById('print-single-id').value;
             if(!id) return;
-            showLoading();
+            showToast('กำลังสร้างตัวอย่างบัตร...');
             try {
                 const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
                 
@@ -3318,7 +3327,6 @@
             } catch(e){
                 showToast('Error', true);
             }
-            hideLoading();
         }
 
         function searchGroupPrint() {
