@@ -900,68 +900,92 @@
         };
     </script>
 
-    <!-- Issue Modal (สำหรับทำบัตร ป็อปอัพ) -->
+   <!-- Issue Modal (สำหรับทำบัตร ป็อปอัพ) -->
     <div id="issue-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto">
             <div class="flex justify-between items-center p-4 border-b sticky top-0 bg-white z-10">
                 <h3 class="font-bold text-xl text-nara-blue"><i class="fas fa-id-badge"></i> ตรวจสอบข้อมูลและออกบัตร</h3>
-                <button onclick="closeIssueModal()" class="text-gray-500 hover:text-red-500 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"><i class="fas fa-times"></i></button>
+                <button onclick="closeIssueModal()" class="text-gray-500 hover:text-red-500 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors"><i class="fas fa-times"></i></button>
             </div>
-            <div class="p-6">
+            <div class="p-4 md:p-6">
                 <form id="form-maker" onsubmit="event.preventDefault(); saveCardHistory(event); return false;">
                     <div class="flex flex-col md:flex-row gap-6">
                         <!-- กล้องและรูป -->
                         <div class="w-full md:w-48 flex flex-col items-center">
-                            <div class="w-32 h-40 border-2 border-gray-300 bg-gray-100 flex items-center justify-center overflow-hidden mb-2 relative rounded shadow-inner">
+                            <div class="w-32 h-40 border-2 border-gray-300 bg-gray-100 flex items-center justify-center overflow-hidden mb-3 relative rounded shadow-inner">
                                 <img id="maker-photo" src="" class="w-full h-full object-cover hidden">
                                 <i id="maker-photo-icon" class="fas fa-user text-4xl text-gray-300"></i>
                             </div>
-                            <button type="button" onclick="openCameraModal()" class="w-full bg-nara-yellow text-nara-blue font-bold py-2 rounded text-sm mb-2 hover:bg-yellow-500 shadow"><i class="fas fa-camera"></i> ถ่ายภาพใหม่</button>
+                            <button type="button" onclick="openCameraModal()" class="w-full max-w-[200px] md:max-w-none bg-nara-yellow text-nara-blue font-bold py-2.5 rounded-lg text-sm mb-2 hover:bg-yellow-500 shadow transition-colors"><i class="fas fa-camera mr-1"></i> ถ่ายภาพใหม่</button>
                             <input type="hidden" id="maker-photo-base64">
                         </div>
                         <!-- ข้อมูล -->
                         <div class="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div><label class="text-xs text-gray-500">เลขประจำตัว</label><input type="text" id="m-id" class="w-full p-2 border rounded bg-gray-50 text-sm font-bold text-nara-blue" readonly></div>
-                            <div class="md:col-span-2"><label class="text-xs text-gray-500">ชื่อ-นามสกุล</label><input type="text" id="m-name" class="w-full p-2 border rounded bg-gray-50 text-sm" readonly></div>
+                            <div class="col-span-1">
+                                <label class="text-xs text-gray-500 font-bold mb-1 block">เลขประจำตัว</label>
+                                <input type="text" id="m-id" class="w-full p-2.5 border rounded-lg bg-gray-50 text-sm font-bold text-nara-blue outline-none" readonly>
+                            </div>
+                            <div class="col-span-1 md:col-span-2">
+                                <label class="text-xs text-gray-500 font-bold mb-1 block">ชื่อ-นามสกุล</label>
+                                <input type="text" id="m-name" class="w-full p-2.5 border rounded-lg bg-gray-50 text-sm font-bold outline-none" readonly>
+                            </div>
                             
-                            <!-- เปลี่ยนจากช่องข้อความธรรมดา เป็นตัวเลือก ชั้น และ ห้อง -->
-                            <div>
-                                <label class="text-xs text-gray-500">ชั้นเรียน</label>
-                                <select id="m-class-level" class="w-full p-2 border rounded text-sm bg-white" onchange="updateMakerProgramAuto()" required>
+                            <!-- ตัวเลือก ชั้น และ ห้อง -->
+                            <div class="col-span-1">
+                                <label class="text-xs text-gray-500 font-bold mb-1 block">ชั้นเรียน <span class="text-red-500">*</span></label>
+                                <select id="m-class-level" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:border-nara-blue focus:ring-1 focus:ring-nara-blue outline-none transition" onchange="updateMakerProgramAuto()" required>
                                     <option value="">เลือกชั้น</option>
                                     <option value="ม.1">ม.1</option><option value="ม.2">ม.2</option><option value="ม.3">ม.3</option>
                                     <option value="ม.4">ม.4</option><option value="ม.5">ม.5</option><option value="ม.6">ม.6</option>
                                 </select>
                             </div>
-                            <div>
-                                <label class="text-xs text-gray-500">ห้อง</label>
-                                <select id="m-class-room" class="w-full p-2 border rounded text-sm bg-white" onchange="updateMakerProgramAuto()" required>
+                            <div class="col-span-1">
+                                <label class="text-xs text-gray-500 font-bold mb-1 block">ห้อง <span class="text-red-500">*</span></label>
+                                <select id="m-class-room" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:border-nara-blue focus:ring-1 focus:ring-nara-blue outline-none transition" onchange="updateMakerProgramAuto()" required>
                                     <option value="">เลือกห้อง</option>
                                     <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
                                     <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
                                 </select>
                             </div>
-                            <div><label class="text-xs text-gray-500">แผนการเรียน</label><input type="text" id="m-program" class="w-full p-2 border rounded bg-gray-50 text-sm" readonly></div>
+                            <div class="col-span-1">
+                                <label class="text-xs text-gray-500 font-bold mb-1 block">แผนการเรียน</label>
+                                <input type="text" id="m-program" class="w-full p-2.5 border rounded-lg bg-gray-50 text-sm font-bold outline-none" readonly>
+                            </div>
                             
-                            <div><label class="text-xs text-gray-500">อายุ</label><input type="text" id="m-age" class="w-full p-2 border rounded bg-gray-50 text-sm" readonly></div>
+                            <div class="col-span-1">
+                                <label class="text-xs text-gray-500 font-bold mb-1 block">อายุ</label>
+                                <input type="text" id="m-age" class="w-full p-2.5 border rounded-lg bg-gray-50 text-sm font-bold outline-none" readonly>
+                            </div>
                             <!-- เพิ่มฟอร์มที่อยู่ -->
-                            <div class="md:col-span-2"><label class="text-xs text-gray-500">ที่อยู่ปัจจุบัน</label><input type="text" id="m-address" class="w-full p-2 border rounded text-sm bg-white" placeholder="เช่น 123 ม.1 ต.นรา อ.เมือง จ.นราธิวาส 96000"></div>
+                            <div class="col-span-1 md:col-span-2">
+                                <label class="text-xs text-gray-500 font-bold mb-1 block">ที่อยู่ปัจจุบัน</label>
+                                <input type="text" id="m-address" class="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:border-nara-blue focus:ring-1 focus:ring-nara-blue outline-none transition" placeholder="เช่น 123 ม.1 ต.นรา อ.เมือง จ.นราธิวาส 96000">
+                            </div>
                             
-                            <div class="col-span-3 border-t pt-4 mt-2"></div>
+                            <!-- เส้นกั้น (แก้ไขการแสดงผลในมือถือ) -->
+                            <div class="col-span-1 md:col-span-3 border-t pt-4 mt-2 w-full"></div>
 
-                            <div><label class="text-xs font-bold text-nara-blue">วันออกบัตร</label><input type="date" id="m-issue" class="w-full p-2 border border-blue-300 rounded text-sm bg-blue-50 shadow-sm" required></div>
-                            <div>
-                                <label class="text-xs font-bold text-nara-blue">อายุบัตร (ปี)</label>
-                                <select id="m-expire-years" class="w-full p-2 border border-blue-300 rounded text-sm bg-blue-50 shadow-sm" onchange="calcExpire()">
+                            <div class="col-span-1">
+                                <label class="text-xs font-bold text-nara-blue mb-1 block">วันออกบัตร</label>
+                                <input type="date" id="m-issue" class="w-full p-2.5 border border-blue-300 rounded-lg text-sm bg-blue-50 shadow-sm outline-none" required>
+                            </div>
+                            <div class="col-span-1">
+                                <label class="text-xs font-bold text-nara-blue mb-1 block">อายุบัตร (ปี)</label>
+                                <select id="m-expire-years" class="w-full p-2.5 border border-blue-300 rounded-lg text-sm bg-blue-50 shadow-sm outline-none cursor-pointer" onchange="calcExpire()">
                                     <option value="1">1 ปี</option><option value="3" selected>3 ปี</option><option value="6">6 ปี</option>
                                 </select>
                             </div>
-                            <div><label class="text-xs font-bold text-red-600">วันหมดอายุ</label><input type="date" id="m-expire" class="w-full p-2 border border-red-300 rounded text-sm bg-red-50 shadow-sm" readonly></div>
+                            <div class="col-span-1">
+                                <label class="text-xs font-bold text-red-600 mb-1 block">วันหมดอายุ</label>
+                                <input type="date" id="m-expire" class="w-full p-2.5 border border-red-300 rounded-lg text-sm bg-red-50 shadow-sm font-bold text-red-700 outline-none" readonly>
+                            </div>
                         </div>
                     </div>
-                    <div class="mt-8 text-right border-t pt-4 flex justify-end gap-2">
-                        <button type="button" onclick="closeIssueModal()" class="bg-gray-200 text-gray-700 px-6 py-2 rounded shadow hover:bg-gray-300 font-bold">ยกเลิก</button>
-                        <button type="submit" class="bg-green-600 text-white px-8 py-2 rounded shadow hover:bg-green-700 font-bold text-lg"><i class="fas fa-check-circle"></i> บันทึกและออกบัตร</button>
+                    
+                    <!-- ส่วนปุ่มกด (ปรับเรียงตัวอัตโนมัติในหน้าจอมือถือ) -->
+                    <div class="mt-8 border-t pt-5 flex flex-col-reverse md:flex-row justify-end gap-3">
+                        <button type="button" onclick="closeIssueModal()" class="w-full md:w-auto bg-gray-200 text-gray-700 px-6 py-3 md:py-2.5 rounded-lg shadow hover:bg-gray-300 font-bold transition-colors text-center">ยกเลิก</button>
+                        <button type="submit" class="w-full md:w-auto bg-green-600 text-white px-8 py-3 md:py-2.5 rounded-lg shadow hover:bg-green-700 font-bold text-base md:text-lg transition-colors text-center flex items-center justify-center"><i class="fas fa-check-circle mr-2"></i> บันทึกและออกบัตร</button>
                     </div>
                 </form>
             </div>
