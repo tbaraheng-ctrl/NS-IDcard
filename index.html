@@ -842,7 +842,12 @@
             <div class="relative w-full aspect-[3/4] bg-black rounded overflow-hidden flex items-center justify-center">
                 <video id="webcam-video" autoplay playsinline class="absolute h-full w-auto max-w-none transform scale-x-[-1]"></video>
                 <!-- Guideline -->
-                <div class="absolute inset-0 border-4 border-dashed border-white opacity-50 m-8 rounded"></div>
+                <div class="absolute inset-0 border-4 border-dashed border-white opacity-50 m-8 rounded pointer-events-none"></div>
+                
+                <!-- ปุ่มสลับกล้อง (หน้า/หลัง) -->
+                <button type="button" onclick="switchCamera()" class="absolute top-4 right-4 bg-gray-800 bg-opacity-70 text-white w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-700 transition shadow-lg z-20" title="สลับกล้อง">
+                    <i class="fas fa-sync-alt text-lg"></i>
+                </button>
             </div>
             <canvas id="webcam-canvas" class="hidden"></canvas>
             
@@ -857,6 +862,43 @@
             </div>
         </div>
     </div>
+
+    <!-- Script สำหรับควบคุมการสลับกล้อง -->
+    <script>
+        window.currentFacingMode = 'user'; // ค่าเริ่มต้นเป็นกล้องหน้า ('user')
+        
+        window.switchCamera = function() {
+            // สลับโหมด
+            window.currentFacingMode = window.currentFacingMode === 'user' ? 'environment' : 'user';
+            
+            const videoEl = document.getElementById('webcam-video');
+            
+            // กลับด้านวิดีโอ (Mirror) เฉพาะตอนใช้กล้องหน้าเท่านั้น
+            if(window.currentFacingMode === 'user') {
+                videoEl.classList.add('scale-x-[-1]');
+            } else {
+                videoEl.classList.remove('scale-x-[-1]');
+            }
+            
+            // ปิดการทำงานของกล้องตัวเดิมก่อน
+            if (window.currentStream) {
+                window.currentStream.getTracks().forEach(track => track.stop());
+            }
+            
+            // ร้องขอสิทธิ์และเปิดกล้องในหน้าต่างที่เลือก
+            navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: window.currentFacingMode } 
+            })
+            .then(stream => {
+                window.currentStream = stream; // เก็บสตรีมใหม่ไว้
+                videoEl.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Camera switch error: ", err);
+                alert('ไม่สามารถเปิดใช้งานกล้องได้ หรืออุปกรณ์นี้ไม่มีกล้องอีกด้าน');
+            });
+        };
+    </script>
 
     <!-- Issue Modal (สำหรับทำบัตร ป็อปอัพ) -->
     <div id="issue-modal" class="fixed inset-0 bg-black bg-opacity-60 z-40 hidden flex items-center justify-center p-4">
