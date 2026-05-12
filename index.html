@@ -851,6 +851,13 @@
             </div>
             <canvas id="webcam-canvas" class="hidden"></canvas>
             
+            <!-- แถบปรับความสว่างภาพ (เพิ่มส่วนนี้เข้ามา) -->
+            <div class="mt-4 px-2 flex items-center gap-3">
+                <i class="fas fa-sun text-gray-400 text-sm"></i>
+                <input type="range" id="brightness-slider" min="50" max="150" value="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" oninput="updateBrightness()">
+                <i class="fas fa-sun text-yellow-500 text-lg"></i>
+            </div>
+            
             <div id="camera-controls" class="mt-4 flex gap-2">
                 <button onclick="takeSnapshot()" class="flex-1 bg-nara-blue text-white py-3 rounded font-bold"><i class="fas fa-camera text-xl"></i> ถ่ายรูป</button>
                 <button onclick="closeCameraModal()" class="flex-1 bg-red-500 text-white py-3 rounded font-bold">ยกเลิก</button>
@@ -2898,26 +2905,51 @@
             }
         }
         
+        // ฟังก์ชันอัปเดตความสว่างของภาพหน้ากล้องแบบเรียลไทม์
+        function updateBrightness() {
+            const val = document.getElementById('brightness-slider').value;
+            const video = document.getElementById('webcam-video');
+            video.style.filter = `brightness(${val}%)`;
+        }
+
         async function openCameraModal() {
             document.getElementById('camera-modal').classList.remove('hidden');
             const video = document.getElementById('webcam-video');
+            
+            // รีเซ็ตความสว่างให้เป็นค่า 100% (ปกติ) ทุกครั้งที่เปิดหน้าต่างกล้อง
+            const slider = document.getElementById('brightness-slider');
+            if(slider) slider.value = 100;
+            video.style.filter = 'brightness(100%)';
+
             try {
-                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                // จำค่ากล้องล่าสุด (หน้า/หลัง) ที่สลับไว้มาใช้งาน
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: window.currentFacingMode || "user" } });
                 video.srcObject = videoStream;
             } catch(e) { alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบสิทธิ์"); closeCameraModal(); }
         }
+        
         function closeCameraModal() {
             document.getElementById('camera-modal').classList.add('hidden');
             if(videoStream) videoStream.getTracks().forEach(track => track.stop());
             document.getElementById('camera-controls').classList.remove('hidden');
             document.getElementById('snapshot-controls').classList.add('hidden');
         }
+        
         function takeSnapshot() {
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
             canvas.width = 300; canvas.height = 400; 
             const ctx = canvas.getContext('2d');
-            ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+            
+            // ดึงค่าความสว่างที่ปรับไว้ มาวาดฝังลงไปในรูปภาพที่จะบันทึก
+            const brightnessVal = document.getElementById('brightness-slider') ? document.getElementById('brightness-slider').value : 100;
+            ctx.filter = `brightness(${brightnessVal}%)`;
+            
+            // สั่งพลิกภาพ (Mirror) เฉพาะตอนใช้ "กล้องหน้า" เท่านั้น 
+            if (!window.currentFacingMode || window.currentFacingMode === 'user') {
+                ctx.translate(canvas.width, 0); 
+                ctx.scale(-1, 1);
+            }
             
             const vW = video.videoWidth, vH = video.videoHeight, ratio = 3/4;
             let sx, sy, sW, sH;
@@ -2925,10 +2957,15 @@
             else { sW = vW; sH = vW / ratio; sx = 0; sy = (vH - sH)/2; }
             
             ctx.drawImage(video, sx, sy, sW, sH, 0, 0, canvas.width, canvas.height);
+            
+            // ล้างการตั้งค่าแสงออก เพื่อไม่ให้รูปอื่นติดเอฟเฟกต์ไปด้วย
+            ctx.filter = 'none'; 
+            
             video.pause();
             document.getElementById('camera-controls').classList.add('hidden');
             document.getElementById('snapshot-controls').classList.remove('hidden');
         }
+        
         function retakeSnapshot() {
             document.getElementById('webcam-video').play();
             document.getElementById('camera-controls').classList.remove('hidden');
@@ -3305,23 +3342,39 @@
                             styleStr += ` border-radius:${el.borderRadius}; overflow:hidden;`;
                         }
 
-                        if (el.type === 'photo') {
-                            const photoUrl = studentData['รูปถ่าย_Base64'] || 'https://via.placeholder.com/150';
+                        // แก้ไข: เช็คชนิดข้อมูลอย่างรัดกุม (ทั้ง type และ field) เผื่อกรณีเซฟเลย์เอาต์ผิดพลาด
+                        if (el.type === 'photo' || el.field === '[รูปถ่าย]') {
+                            // ดึงรูปจากฐานข้อมูลนักเรียนก่อน ถ้าไม่มีให้ไปแอบดึงจากประวัติการออกบัตรมาใช้
+                            let photoUrl = studentData['รูปถ่าย_Base64'];
+                            if (!photoUrl && historyRecord && historyRecord['รูปถ่าย_Base64']) {
+                                photoUrl = historyRecord['รูปถ่าย_Base64'];
+                            }
+                            photoUrl = photoUrl || 'https://via.placeholder.com/150';
+                            
+                            // ป้องกันกรณีผู้ใช้ลบขนาดกล่องรูปทิ้ง ให้มีขนาดพื้นฐานเสมอ
+                            if(!el.width && !el.height) { styleStr += ` width:2.5cm; height:3cm;`; } 
                             if(!el.borderColor) styleStr += ` border:1px solid #ccc;`;
-                            styleStr += ` background:#eee;`;
+                            styleStr += ` background:#eee; z-index: 10;`;
+                            
                             content = `<img src="${photoUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit; display:block;">`;
-                        } else if (el.type === 'qr') {
-                            styleStr += ` background:white; padding:2px;`;
+                            
+                        } else if (el.type === 'qr' || el.field === '[QR Code]') {
+                            styleStr += ` background:white; padding:2px; z-index: 10;`;
+                            if(!el.width && !el.height) { styleStr += ` width:40px; height:40px;`; }
                             qrIdToRender = `qr_${idTag}_${el.id}`;
                             content = `<style>#${qrIdToRender} { display:flex; align-items:center; justify-content:center; width:100%; height:100%; } #${qrIdToRender} img, #${qrIdToRender} canvas { max-width: 100% !important; max-height: 100% !important; object-fit: contain; }</style><div id="${qrIdToRender}"></div>`;
-                        } else if (el.type === 'signature') {
+                        } else if (el.type === 'signature' || el.field === '[ลายเซ็นผู้ลงนาม]') {
                             const sigUrl = st.sigBase64 || 'https://via.placeholder.com/80x30?text=Signature';
+                            if(!el.width && !el.height) { styleStr += ` width:80px; height:30px;`; }
+                            styleStr += ` z-index: 10;`;
                             content = `<img src="${sigUrl}" style="width:100%; height:100%; object-fit:contain; display:block;">`;
-                        } else if (el.type === 'logo') {
+                        } else if (el.type === 'logo' || el.field === '[โลโก้โรงเรียน]') {
                             const logoUrl = st.logoBase64 || 'https://upload.wikimedia.org/wikipedia/th/thumb/e/e0/Narasikkhalai_School_Logo.png/200px-Narasikkhalai_School_Logo.png';
+                            if(!el.width && !el.height) { styleStr += ` width:60px; height:60px;`; }
+                            styleStr += ` z-index: 10;`;
                             content = `<img src="${logoUrl}" style="width:100%; height:100%; object-fit:contain; display:block;">`;
                         } else {
-                            styleStr += ` max-width:100%;`;
+                            styleStr += ` max-width:100%; z-index: 20;`;
                             if(el.field === '[ข้อปฏิบัติ]') {
                                 styleStr += ` white-space:pre-wrap; line-height:1.2;`;
                             } else if (el.field === '[ที่อยู่]' || el.field === '[ที่อยู่โรงเรียน]') {
