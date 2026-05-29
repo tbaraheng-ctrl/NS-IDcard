@@ -307,8 +307,7 @@
                                             <button type="button" onclick="applyDynamicTemplate('back', 1)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 1</button>
                                             <button type="button" onclick="applyDynamicTemplate('back', 2)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 2</button>
                                             <button type="button" onclick="applyDynamicTemplate('back', 3)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 3</button>
-                                            <button type="button" onclick="applyDynamicTemplate('back', 4)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 4</button>
-                                            <button type="button" onclick="applyDynamicTemplate('back', 5)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 5</button>
+                                            <button type="button" onclick="applyDynamicTemplate('back', 4)" class="px-3 py-1 text-xs rounded border bg-green-100 hover:bg-green-200 shadow-sm">แบบที่ 5</button>
                                         </div>
                                         <input type="file" accept="image/*" onchange="previewImageToBase64(this, null, applyBackBg)" class="w-full p-1 text-xs border rounded" title="อัปโหลดพื้นหลังด้านหลังเอง">
                                         <input type="hidden" id="set-bg-back-base64">
@@ -327,7 +326,6 @@
                                                 <option value="[QR Code]">QR Code</option>
                                                 <option value="[ชื่อ-สกุล]">ชื่อ-สกุล</option>
                                                 <option value="[เลขประจำตัว]">เลขประจำตัว</option>
-                                                <option value="[เลขประจำตัวประชาชน]">เลขประจำตัวประชาชน</option>
                                                 <option value="[เลขที่บัตร]">เลขที่บัตร (รันอัตโนมัติ)</option>
                                                 <option value="[ชั้น/ห้อง]">ชั้น/ห้อง</option>
                                                 <option value="[แผนการเรียน]">แผนการเรียน</option>
@@ -482,6 +480,8 @@
                             <button onclick="document.getElementById('csv-file').click()" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700"><i class="fas fa-file-import"></i> นำเข้าด้วย CSV</button>
                             <input type="file" id="csv-file" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
                             <button onclick="downloadCSVTemplate()" class="bg-gray-500 text-white px-4 py-2 rounded shadow hover:bg-gray-600"><i class="fas fa-file-csv"></i> โหลดเทมเพลต</button>
+                            <!-- ปุ่มรายงานคนไม่มีรูป -->
+                            <button onclick="openMissingPhotoReport()" class="bg-red-500 text-white px-4 py-2 rounded shadow hover:bg-red-600 transition"><i class="fas fa-user-times mr-1"></i> เช็คคนไม่มีรูป</button>
                         </div>
                         <div class="flex gap-2 w-full md:w-auto">
                             <input type="text" id="search-stu-input" placeholder="ค้นหาด้วยเลขประจำตัว..." class="p-2 border rounded shadow-sm w-full md:w-64" onkeyup="searchStudentDB()">
@@ -613,7 +613,11 @@
                 <!-- 5. ทำบัตรนักเรียน -->
                 <div id="menu-makercard" class="content-section hidden">
                     <div class="bg-nara-light border border-blue-200 p-6 rounded-xl mb-6">
-                        <h3 class="font-bold text-nara-blue text-lg mb-4"><i class="fas fa-search"></i> ค้นหานักเรียนเพื่อออกบัตร</h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-nara-blue text-lg"><i class="fas fa-search"></i> ค้นหานักเรียนเพื่อออกบัตร</h3>
+                            <!-- ปุ่มรายงานคนไม่มีรูปถ่ายในหน้าทำบัตร -->
+                            <button onclick="openMissingPhotoReport()" class="bg-red-500 text-white px-4 py-2 rounded shadow hover:bg-red-600 transition"><i class="fas fa-user-times mr-1"></i> เช็คคนไม่มีรูป</button>
+                        </div>
                         
                         <div class="flex flex-col md:flex-row gap-6 mb-2">
                             <!-- ค้นหาเดี่ยว -->
@@ -788,7 +792,7 @@
                         </div>
                     </div>
 
-                    <!-- Tab พิมพ์คิวรอพิมพ์ (เพิ่มใหม่) -->
+                    <!-- Tab พิมพ์คิวรอพิมพ์ -->
                     <div id="print-tab3" class="hidden">
                         <div class="bg-white p-6 rounded-xl shadow-sm mb-6">
                             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
@@ -852,20 +856,34 @@
             </div>
             <canvas id="webcam-canvas" class="hidden"></canvas>
             
-            <!-- ปุ่มเลือกฟิลเตอร์หน้าใส -->
-            <div class="mt-4 px-2 flex justify-between gap-2 overflow-x-auto hide-scroll pb-1">
-                <button type="button" onclick="setFilterPreset('normal', this)" class="preset-btn flex-1 bg-blue-500 text-white border-blue-500 font-bold shadow px-2 py-1.5 rounded text-xs whitespace-nowrap transition-colors">ต้นฉบับ</button>
-                <button type="button" onclick="setFilterPreset('minimal', this)" class="preset-btn flex-1 bg-gray-100 text-gray-700 border border-gray-300 px-2 py-1.5 rounded text-xs whitespace-nowrap transition-colors">สว่างใส</button>
-                <button type="button" onclick="setFilterPreset('coral', this)" class="preset-btn flex-1 bg-gray-100 text-gray-700 border border-gray-300 px-2 py-1.5 rounded text-xs whitespace-nowrap transition-colors">อมชมพู</button>
-                <button type="button" onclick="setFilterPreset('soft', this)" class="preset-btn flex-1 bg-gray-100 text-gray-700 border border-gray-300 px-2 py-1.5 rounded text-xs whitespace-nowrap transition-colors">หน้าเนียน</button>
+            <div class="p-4 bg-gray-50 mt-4 rounded-lg">
+                <!-- ฟิลเตอร์หน้าใส -->
+                <div id="filter-presets-container" class="mb-4">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">ฟิลเตอร์แต่งภาพอัตโนมัติ</p>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button type="button" onclick="setFilterPreset('normal', this)" class="filter-btn active-filter text-[11px] py-2 rounded-lg border transition-all bg-white shadow-sm border-blue-500 text-blue-600 font-bold">ต้นฉบับ</button>
+                        <button type="button" onclick="setFilterPreset('minimal', this)" class="filter-btn text-[11px] py-2 rounded-lg border transition-all bg-white border-gray-200 text-gray-600">ขาวใส</button>
+                        <button type="button" onclick="setFilterPreset('soft', this)" class="filter-btn text-[11px] py-2 rounded-lg border transition-all bg-white border-gray-200 text-gray-600">หน้าเนียน</button>
+                        <button type="button" onclick="setFilterPreset('warm', this)" class="filter-btn text-[11px] py-2 rounded-lg border transition-all bg-white border-gray-200 text-gray-600">อมชมพู</button>
+                    </div>
+                </div>
+
+                <!-- แถบปรับความสว่าง (แก้ไขเป็น brightness-slider และใช้ updateBrightnessControl) -->
+                <div class="flex items-center gap-3 bg-white p-2 rounded-lg border border-gray-100">
+                    <i class="fas fa-sun text-yellow-500"></i>
+                    <input type="range" id="brightness-slider" min="50" max="150" value="100" class="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" oninput="updateBrightnessControl()">
+                    <span id="brightness-value" class="text-xs font-mono text-gray-400 w-8">100%</span>
+                </div>
             </div>
-            
-            <!-- แถบปรับความสว่างภาพ -->
-            <div class="mt-2 px-2 flex items-center gap-3">
-                <i class="fas fa-sun text-gray-400 text-sm"></i>
-                <input type="range" id="brightness-slider" min="50" max="150" value="100" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" oninput="applyLiveFilters()">
-                <i class="fas fa-sun text-yellow-500 text-lg"></i>
-            </div>
+
+            <style>
+                .active-filter {
+                    background: #eff6ff !important;
+                    border-color: #3b82f6 !important;
+                    color: #2563eb !important;
+                    font-weight: bold;
+                }
+            </style>
             
             <div id="camera-controls" class="mt-4 flex gap-2">
                 <button onclick="takeSnapshot()" class="flex-1 bg-nara-blue text-white py-3 rounded font-bold"><i class="fas fa-camera text-xl"></i> ถ่ายรูป</button>
@@ -1019,6 +1037,22 @@
             <div class="flex gap-3 justify-center">
                 <button onclick="closeDeleteModal()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-bold transition-colors">ยกเลิก</button>
                 <button id="confirm-delete-btn" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold shadow-lg transition-colors">ยืนยันการลบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Missing Photo Report Modal (เพิ่มตรงนี้เพื่อแก้บั๊ก InnerHTML of Null) -->
+    <div id="missing-photo-modal" class="fixed inset-0 bg-black bg-opacity-70 z-[55] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
+            <div class="flex justify-between items-center p-4 border-b bg-red-50">
+                <h3 class="font-bold text-lg text-red-600"><i class="fas fa-user-times mr-2"></i>รายงานนักเรียนที่ยังไม่มีรูปถ่าย</h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="printMissingPhotoReport()" class="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-red-700 shadow transition flex items-center gap-1 font-bold"><i class="fas fa-print"></i> พิมพ์รายงาน PDF</button>
+                    <button onclick="closeMissingPhotoReport()" class="text-gray-400 hover:text-red-500 hover:bg-white rounded-full w-8 h-8 flex items-center justify-center transition"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div id="missing-photo-content" class="flex-1 overflow-y-auto p-6 bg-gray-50">
+                <!-- ข้อมูลคนไม่มีรูปจะถูกเรนเดอร์ในนี้ทาง Javascript -->
             </div>
         </div>
     </div>
@@ -1196,64 +1230,12 @@
             }
         }
 
-        // ฟังก์ชันแปลงวันที่เป็น พ.ศ. แบบสั้น (dd/mm/yyyy+543) รองรับหลายรูปแบบ
-        function formatThaiDateShort(dateInput) {
-            if (!dateInput) return '';
-            
-            let d, m, y;
-            
-            // กรณีรับค่ามาเป็น Object Date โดยตรง
-            if (dateInput instanceof Date) {
-                if (isNaN(dateInput.getTime())) return '';
-                y = dateInput.getFullYear();
-                if (y < 2400) y += 543;
-                const dd = String(dateInput.getDate()).padStart(2, '0');
-                const mm = String(dateInput.getMonth() + 1).padStart(2, '0');
-                return `${dd}/${mm}/${y}`;
-            }
-
-            // กรณีรับค่ามาเป็น String (ตัดช่องว่าง)
-            const str = String(dateInput).trim();
-            const parts = str.split(/[\/\-T\s]/);
-            
-            // ถ้าสามารถแยกชิ้นส่วนวันที่ได้ (อย่างน้อย วัน, เดือน, ปี)
-            if (parts.length >= 3) {
-                if (parts[0].length >= 4) {
-                    // รูปแบบ YYYY-MM-DD
-                    y = parseInt(parts[0], 10);
-                    m = parseInt(parts[1], 10);
-                    d = parseInt(parts[2].substring(0, 2), 10);
-                } else {
-                    // รูปแบบ DD/MM/YYYY หรือ DD-MM-YYYY
-                    d = parseInt(parts[0], 10);
-                    m = parseInt(parts[1], 10);
-                    y = parseInt(parts[2].substring(0, 4), 10);
-                }
-                
-                if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
-                    // ถ้าปีน้อยกว่า 2400 ถือว่าเป็น ค.ศ. ให้แปลงเป็น พ.ศ.
-                    if (y < 2400) y += 543;
-                    
-                    // เติม 0 ด้านหน้าถ้าเป็นเลขหลักเดียว
-                    const dd = String(d).padStart(2, '0');
-                    const mm = String(m).padStart(2, '0');
-                    
-                    return `${dd}/${mm}/${y}`;
-                }
-            }
-            
-            // Fallback: ให้ JS ลองพยายามอ่านวันที่เอง
-            const dateObj = new Date(str);
-            if (!isNaN(dateObj.getTime())) {
-                 let year = dateObj.getFullYear();
-                 if(year < 2400) year += 543;
-                 const dd = String(dateObj.getDate()).padStart(2, '0');
-                 const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-                 return `${dd}/${mm}/${year}`;
-            }
-            
-            // ถ้าแปลงไม่ได้เลย ให้คืนค่าเดิม
-            return str;
+        // ฟังก์ชันแปลงวันที่เป็น พ.ศ. แบบสั้น (d/m/yyyy+543)
+        function formatThaiDateShort(dateString) {
+            if (!dateString) return '';
+            const d = new Date(dateString);
+            if (isNaN(d.getTime())) return dateString;
+            return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear() + 543}`;
         }
 
         // ฟังก์ชันสร้างเทมเพลต SVG อัตโนมัติ (Dynamic SVG Templates)
@@ -1960,7 +1942,6 @@
                 else if (field === '[ที่อยู่โรงเรียน]') text = systemSettings.schoolAddress || 'ที่อยู่โรงเรียน';
                 else if (field === '[เว็บไซต์โรงเรียน]') text = systemSettings.schoolWebsite || 'www.school.ac.th';
                 else if (field === '[เลขประจำตัว]') text = '12345';
-                else if (field === '[เลขประจำตัวประชาชน]') text = '1-2345-67890-12-3';
                 else if (field === '[เลขที่บัตร]') text = 'Nscd 0001';
                 else if (field === '[ชื่อ-สกุล]') text = 'นายสมชาย รักเรียน';
                 else if (field === '[ชั้น/ห้อง]') text = 'ม.4/1';
@@ -2599,6 +2580,22 @@
                 });
             }
             renderStudentTable(filtered);
+
+            // --- เริ่มการแก้ไข: ดึงข้อมูลลงฟอร์มอัตโนมัติเมื่อพบข้อมูล ---
+            if (q) {
+                // 1. ตรวจสอบว่ามีเลขประจำตัวตรงเป๊ะๆ หรือไม่
+                const exactMatch = allStudents.find(s => s['เลขประจำตัว'].toString() === q);
+                
+                // หากเจอข้อมูลเลขประจำตัวตรงเป๊ะ และข้อมูลนี้ยังไม่ได้โชว์ในฟอร์ม
+                if (exactMatch && document.getElementById('stu-code').value !== q) {
+                    editStudent(exactMatch);
+                } 
+                // 2. หรือหากผลการค้นหาถูกกรองจนเหลือแค่ 1 คนพอดี (เช่น พิมพ์ชื่อ-สกุล จนเจอคนเดียว)
+                else if (filtered.length === 1 && document.getElementById('stu-code').value !== filtered[0]['เลขประจำตัว'].toString()) {
+                    editStudent(filtered[0]);
+                }
+            }
+            // --- จบการแก้ไข ---
         }
 
         function editStudent(s) {
@@ -2739,6 +2736,229 @@
                 itemToDelete = null;
                 typeToDelete = null;
             }, 200);
+        }
+
+        // ==========================================
+        // ระบบรายงานนักเรียนที่ไม่มีรูปถ่าย (เพิ่มใหม่ / แก้ไขตัวแปรไอดีที่ทำให้พัง)
+        // ==========================================
+        window.openMissingPhotoReport = function() {
+            const modal = document.getElementById('missing-photo-modal');
+            const contentArea = document.getElementById('missing-photo-content');
+            
+            // 1. รวบรวมรหัสนักเรียนทั้งหมด "ที่มีรูปถ่ายแล้ว" ไม่ว่าจะซ้ำกี่รายการก็ตาม
+            const idsWithPhoto = new Set();
+            
+            // ตรวจสอบจากฐานข้อมูลนักเรียน
+            allStudents.forEach(s => {
+                if (s['รูปถ่าย_Base64'] && s['รูปถ่าย_Base64'].trim() !== '') {
+                    if (s['เลขประจำตัว']) idsWithPhoto.add(s['เลขประจำตัว'].toString());
+                }
+            });
+            
+            // ตรวจสอบจากประวัติการออกบัตร
+            allCardHistory.forEach(h => {
+                if (h['รูปถ่าย_Base64'] && h['รูปถ่าย_Base64'].trim() !== '') {
+                    if (h['เลขประจำตัวนักเรียน']) idsWithPhoto.add(h['เลขประจำตัวนักเรียน'].toString());
+                }
+            });
+
+            // 2. หากลุ่มนักเรียนที่ไม่มีรหัสอยู่ใน idsWithPhoto (กรองรายการซ้ำออกให้เหลือคนละ 1 รายการ)
+            const uniqueMissingStudentsMap = new Map();
+            allStudents.forEach(s => {
+                const stuId = s['เลขประจำตัว'] ? s['เลขประจำตัว'].toString() : '';
+                if (stuId && !idsWithPhoto.has(stuId)) {
+                    // ถ้ายังไม่มีรูป ให้เก็บข้อมูลไว้ (ใช้ Map เพื่อป้องกันการแสดงชื่อซ้ำ)
+                    uniqueMissingStudentsMap.set(stuId, s);
+                }
+            });
+            
+            const missingPhotos = Array.from(uniqueMissingStudentsMap.values());
+            
+            if (missingPhotos.length === 0) {
+                contentArea.innerHTML = `
+                    <div class="text-center py-12">
+                        <i class="fas fa-check-circle text-6xl text-green-500 mb-4 block"></i>
+                        <h4 class="text-xl font-bold text-gray-800">ข้อมูลครบถ้วน!</h4>
+                        <p class="text-gray-600 mt-2">นักเรียนในระบบทุกคนมีรูปถ่ายเรียบร้อยแล้ว (ตรวจพบจากฐานข้อมูลและประวัติ)</p>
+                    </div>`;
+            } else {
+                // จัดกลุ่มตามชั้น/ห้อง
+                const groupedByClass = {};
+                missingPhotos.forEach(s => {
+                    const classRoom = s['ชั้น/ห้อง'] || 'ไม่ระบุชั้น/ห้อง';
+                    if (!groupedByClass[classRoom]) groupedByClass[classRoom] = [];
+                    groupedByClass[classRoom].push(s);
+                });
+
+                // เรียงลำดับชั้นห้องให้สวยงาม
+                const sortedClasses = Object.keys(groupedByClass).sort();
+                
+                let html = `
+                    <div class="bg-red-50 border border-red-200 p-4 rounded-xl mb-6 text-center shadow-inner">
+                        <p class="text-gray-600 font-medium">พบนักเรียนที่ยังไม่มีรูปถ่ายทั้งหมด</p>
+                        <p class="text-4xl font-bold text-red-600 my-1">${missingPhotos.length} <span class="text-base font-normal text-gray-600">คน</span></p>
+                        <p class="text-xs text-gray-400">กรุณาอัปโหลดไฟล์รูป หรือถ่ายภาพนักเรียนเพิ่มเติมด้านล่าง</p>
+                    </div>
+                    <div class="space-y-4">
+                `;
+                
+                sortedClasses.forEach(cr => {
+                    html += `
+                    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                        <div class="bg-gray-50 p-3 font-bold text-nara-blue border-b flex justify-between items-center text-sm md:text-base">
+                            <span><i class="fas fa-users mr-2 text-gray-400"></i>ชั้น/ห้อง: ${cr}</span>
+                            <span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold">${groupedByClass[cr].length} คน</span>
+                        </div>
+                        <ul class="divide-y divide-gray-100 max-h-60 overflow-y-auto hide-scroll">
+                    `;
+                    
+                    groupedByClass[cr].forEach(s => {
+                        html += `
+                            <li class="p-3 text-sm flex justify-between items-center hover:bg-blue-50 transition">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400"><i class="fas fa-user text-xs"></i></div>
+                                    <div>
+                                        <p class="font-bold text-gray-800 text-xs md:text-sm">${s['เลขประจำตัว']}</p>
+                                        <p class="text-gray-500 text-xs">${s['ชื่อ-สกุล']}</p>
+                                    </div>
+                                </div>
+                                <button onclick="fixMissingPhoto('${s['เลขประจำตัว']}')" class="text-xs bg-white text-nara-blue border border-blue-300 px-3 py-1.5 rounded-lg hover:bg-blue-50 hover:shadow-sm transition font-medium"><i class="fas fa-camera mr-1"></i> เพิ่มรูป</button>
+                            </li>
+                        `;
+                    });
+                    
+                    html += `</ul></div>`;
+                });
+                html += `</div>`;
+                contentArea.innerHTML = html;
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        window.closeMissingPhotoReport = function() {
+            document.getElementById('missing-photo-modal').classList.add('hidden');
+        }
+
+        // เพิ่มฟังก์ชันสำหรับสร้างรายงาน HTML และสั่งปริ้นท์เป็น PDF
+        window.printMissingPhotoReport = function() {
+            // 1. รวบรวมรหัสนักเรียนทั้งหมด "ที่มีรูปถ่ายแล้ว" ไม่ว่าจะซ้ำกี่รายการก็ตาม
+            const idsWithPhoto = new Set();
+            allStudents.forEach(s => {
+                if (s['รูปถ่าย_Base64'] && s['รูปถ่าย_Base64'].trim() !== '') {
+                    if (s['เลขประจำตัว']) idsWithPhoto.add(s['เลขประจำตัว'].toString());
+                }
+            });
+            allCardHistory.forEach(h => {
+                if (h['รูปถ่าย_Base64'] && h['รูปถ่าย_Base64'].trim() !== '') {
+                    if (h['เลขประจำตัวนักเรียน']) idsWithPhoto.add(h['เลขประจำตัวนักเรียน'].toString());
+                }
+            });
+
+            // 2. หากลุ่มนักเรียนที่ไม่มีรหัสอยู่ใน idsWithPhoto (และกรองรายการซ้ำออกให้เหลือคนละ 1 รายการ)
+            const uniqueMissingStudentsMap = new Map();
+            allStudents.forEach(s => {
+                const stuId = s['เลขประจำตัว'] ? s['เลขประจำตัว'].toString() : '';
+                if (stuId && !idsWithPhoto.has(stuId)) {
+                    uniqueMissingStudentsMap.set(stuId, s);
+                }
+            });
+            
+            const missingPhotos = Array.from(uniqueMissingStudentsMap.values());
+
+            if (missingPhotos.length === 0) {
+                showToast('ไม่มีข้อมูลนักเรียนที่ขาดรูปถ่ายสำหรับพิมพ์', true);
+                return;
+            }
+
+            const groupedByClass = {};
+            missingPhotos.forEach(s => {
+                const classRoom = s['ชั้น/ห้อง'] || 'ไม่ระบุชั้น/ห้อง';
+                if (!groupedByClass[classRoom]) groupedByClass[classRoom] = [];
+                groupedByClass[classRoom].push(s);
+            });
+
+            const sortedClasses = Object.keys(groupedByClass).sort();
+
+            let reportHTML = `
+                <!DOCTYPE html>
+                <html lang="th">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>รายงานนักเรียนที่ยังไม่มีรูปถ่าย</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap');
+                        body { font-family: 'Prompt', sans-serif; padding: 30px; color: #333; background: #fff; line-height: 1.5; }
+                        h1 { text-align: center; color: #1e3a8a; margin-bottom: 5px; font-size: 24px;}
+                        .school-name { text-align: center; color: #555; margin-bottom: 20px; font-size: 16px;}
+                        .summary { text-align: center; font-size: 16px; margin-bottom: 30px; padding: 10px; background: #fee2e2; color: #b91c1c; border-radius: 8px; font-weight: bold;}
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;}
+                        th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+                        th { background-color: #f1f5f9; font-weight: 600; color: #1e3a8a; }
+                        .class-header { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #1e3a8a; border-left: 4px solid #1e3a8a; padding-left: 10px;}
+                        .print-date { text-align: right; font-size: 12px; color: #666; margin-bottom: 20px;}
+                    </style>
+                </head>
+                <body>
+                    <h1>รายงานการตรวจสอบรูปถ่ายนักเรียน</h1>
+                    <div class="school-name">${systemSettings.schoolName || 'โรงเรียนนราสิกขาลัย'}</div>
+                    <div class="print-date">ข้อมูลพิมพ์ ณ วันที่: ${new Date().toLocaleString('th-TH')}</div>
+                    <div class="summary">สรุปยอด: พบนักเรียนที่ยังไม่มีรูปถ่ายในระบบ จำนวน ${missingPhotos.length} คน</div>
+            `;
+
+            sortedClasses.forEach(cr => {
+                reportHTML += `<div class="class-header">ระดับชั้น/ห้อง: ${cr} (จำนวน ${groupedByClass[cr].length} คน)</div>`;
+                reportHTML += `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="15%" style="text-align:center;">ลำดับ</th>
+                                <th width="30%">เลขประจำตัว</th>
+                                <th width="55%">ชื่อ-นามสกุล</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                groupedByClass[cr].forEach((s, index) => {
+                    reportHTML += `
+                        <tr>
+                            <td style="text-align:center;">${index + 1}</td>
+                            <td>${s['เลขประจำตัว']}</td>
+                            <td>${s['ชื่อ-สกุล']}</td>
+                        </tr>
+                    `;
+                });
+                reportHTML += `</tbody></table>`;
+            });
+
+            reportHTML += `
+                    ${'<'}script>
+                        window.onload = function() {
+                            setTimeout(function() { window.print(); }, 500);
+                        };
+                    ${'<'}/script>
+                </body>
+                </html>
+            `;
+
+            const printWin = window.open('', '_blank');
+            if (printWin) {
+                printWin.document.write(reportHTML);
+                printWin.document.close();
+            } else {
+                showToast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาต Pop-up', true);
+            }
+        }
+
+        window.fixMissingPhoto = function(stuId) {
+            closeMissingPhotoReport();
+            nav('menu-students');
+            setTimeout(() => {
+                document.getElementById('search-stu-input').value = stuId;
+                searchStudentDB();
+                editStudentById(stuId);
+                showToast('ระบบได้เตรียมฟอร์มข้อมูลของนักเรียนรหัส ' + stuId + ' ให้เรียบร้อยแล้ว');
+            }, 300);
         }
 
         async function executeDelete() {
@@ -2895,6 +3115,58 @@
             if(successCount > 0) showToast(`บันทึกข้อมูลเบื้องหลังเสร็จสิ้น (${successCount} รายการ)`);
         }
 
+        async function issueSelectedCardsInQueue() {
+            const selected = Array.from(document.querySelectorAll('.chk-queue-item:checked')).map(el => el.value);
+            if(selected.length === 0) { showToast('กรุณาเลือกรายการในคิวที่ต้องการออกบัตร', true); return; }
+            
+            // ยกเลิกคำสั่งหน้าจอหมุนดำๆ ใช้แค่โชว์ข้อความ
+            showToast(`กำลังออกบัตร ${selected.length} รายการ (ทำรายการเบื้องหลัง)...`);
+
+            const issueDate = new Date().toISOString().split('T')[0];
+            let d = new Date(); d.setFullYear(d.getFullYear() + 3);
+            const expireDate = d.toISOString().split('T')[0];
+            
+            let backgroundTasks = [];
+            
+            for (const stuId of selected) {
+                const stuIndex = allStudents.findIndex(s => s['เลขประจำตัว'].toString() === stuId.toString());
+                if (stuIndex === -1) continue;
+                const stu = allStudents[stuIndex];
+                const photoBase64 = stu['รูปถ่าย_Base64'] || '';
+
+                const currentRunNum = "Nscd " + String(allCardHistory.length + 1).padStart(4, '0');
+
+                const data = {
+                    'เลขประจำตัวนักเรียน': stuId,
+                    'วันออกบัตร': issueDate,
+                    'วันหมดอายุ': expireDate,
+                    'สถานะการพิมพ์': 'ยังไม่พิมพ์',
+                    'รูปถ่าย_Base64': photoBase64,
+                    'เลขที่บัตร': currentRunNum,
+                    'ID': new Date().getTime() + Math.floor(Math.random() * 10000) 
+                };
+
+                // อัปเดตความจำในหน้าเว็บทันที
+                allCardHistory.push(data);
+                issueQueueList = issueQueueList.filter(id => id.toString() !== stuId.toString());
+                
+                // เตรียมก้อนข้อมูลไว้ส่งหลังบ้าน
+                const dataForDB = { ...data };
+                delete dataForDB.ID;
+                backgroundTasks.push(dataForDB);
+            }
+
+            // วาดตารางใหม่รวดเดียวจบ (ทำให้เว็บไม่ค้าง)
+            renderIssueQueue();
+            renderCardHistory();
+            
+            const checkAll = document.querySelector('input[onchange="toggleQueueCheckAll(this)"]');
+            if (checkAll) checkAll.checked = false;
+
+            // สั่งรันส่งข้อมูลลง Sheet เบื้องหลัง (ทำงานเงียบๆ)
+            processBackgroundSaves(backgroundTasks);
+        }
+
         function openIssueModal(id, issueDate = null, expireDate = null) {
             const s = allStudents.find(stu => stu['เลขประจำตัว'].toString() === id.toString());
             if(!s) { showToast('ไม่พบข้อมูล', true); return; }
@@ -2915,8 +3187,8 @@
             document.getElementById('m-program').value = s['แผนการเรียน'] || '';
             document.getElementById('m-address').value = s['ที่อยู่'] || '';
 
-            // ดึงข้อมูลอายุจากคอลัมน์ในชีทโดยตรง (อิงตามชื่อหัวคอลัมน์ 'อายุ' ในคอลัมน์ P) หากไม่พบจะใช้วิธีคำนวณแทน
-            document.getElementById('m-age').value = s['อายุ'] || calculatePreciseAge(s['วันเกิด']);
+            // เรียกใช้ฟังก์ชันคำนวณอายุที่แม่นยำแทน
+            document.getElementById('m-age').value = calculatePreciseAge(s['วันเกิด']);
             
             if(s['รูปถ่าย_Base64']) {
                 document.getElementById('maker-photo').src = s['รูปถ่าย_Base64'];
@@ -2972,66 +3244,70 @@
             }
         }
         
-        // ตัวแปรเก็บค่า Filter ปัจจุบัน
-        window.currentFilterValues = { saturate: 100, contrast: 100, blur: 0 };
+        // --- ระบบควบคุมฟิลเตอร์และแก้ไข Error กล้อง ---
+        let currentFilterSettings = { saturate: 100, contrast: 100, blur: 0 };
 
-        // ฟังก์ชันเมื่อกดเลือกปุ่มฟิลเตอร์
-        window.setFilterPreset = function(type, btn) {
-            // อัปเดตสไตล์ของปุ่มให้รู้ว่าถูกเลือก
-            document.querySelectorAll('.preset-btn').forEach(b => {
-                b.classList.remove('bg-blue-500', 'text-white', 'border-blue-500', 'font-bold', 'shadow');
-                b.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-300');
-            });
-            if(btn) {
-                btn.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300');
-                btn.classList.add('bg-blue-500', 'text-white', 'border-blue-500', 'font-bold', 'shadow');
+        window.updateBrightnessControl = function() {
+            const video = document.getElementById('webcam-video');
+            const brightness = document.getElementById('brightness-slider') ? document.getElementById('brightness-slider').value : 100;
+            const { saturate, contrast, blur } = currentFilterSettings;
+            
+            if(document.getElementById('brightness-value')) {
+                document.getElementById('brightness-value').innerText = brightness + "%";
             }
-
-            // ตั้งค่าค่าผสมสีของแต่ละฟิลเตอร์หน้าใส
-            switch(type) {
-                case 'minimal': // สไตล์สว่าง คลีน ลดความสด
-                    window.currentFilterValues = { saturate: 90, contrast: 105, blur: 0 };
-                    document.getElementById('brightness-slider').value = 110;
-                    break;
-                case 'coral': // สไตล์อมชมพู-ส้ม สดใส
-                    window.currentFilterValues = { saturate: 125, contrast: 100, blur: 0 };
-                    document.getElementById('brightness-slider').value = 105;
-                    break;
-                case 'soft': // หน้าเนียน เบลอรูขุมขน
-                    window.currentFilterValues = { saturate: 105, contrast: 90, blur: 0.8 };
-                    document.getElementById('brightness-slider').value = 115;
-                    break;
-                default: // ปกติ
-                    window.currentFilterValues = { saturate: 100, contrast: 100, blur: 0 };
-                    document.getElementById('brightness-slider').value = 100;
-                    break;
+            
+            if(video) {
+                video.style.filter = `brightness(${brightness}%) saturate(${saturate}%) contrast(${contrast}%) blur(${blur}px)`;
             }
-            applyLiveFilters();
         };
 
-        // ฟังก์ชันโชว์ผลลัพธ์ผ่านจอวีดีโอแบบ Real-time
-        window.applyLiveFilters = function() {
-            const b = document.getElementById('brightness-slider').value;
-            const { saturate, contrast, blur } = window.currentFilterValues;
-            const filterStr = `brightness(${b}%) saturate(${saturate}%) contrast(${contrast}%) blur(${blur}px)`;
-            
-            document.getElementById('webcam-video').style.filter = filterStr;
+        // เพื่อป้องกันความผิดพลาดและลิงก์กับฟังก์ชันดั้งเดิม
+        window.updateBrightness = window.updateBrightnessControl;
+
+        window.setFilterPreset = function(type, btn) {
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.className = "filter-btn text-[11px] py-2 rounded-lg border transition-all bg-white border-gray-200 text-gray-600";
+            });
+            if(btn) {
+                btn.className = "filter-btn active-filter text-[11px] py-2 rounded-lg border transition-all bg-white shadow-sm border-blue-500 text-blue-600 font-bold";
+            }
+
+            const slider = document.getElementById('brightness-slider');
+            switch(type) {
+                case 'minimal': 
+                    currentFilterSettings = { saturate: 85, contrast: 110, blur: 0 };
+                    if(slider) slider.value = 115;
+                    break;
+                case 'soft': 
+                    currentFilterSettings = { saturate: 105, contrast: 95, blur: 0.8 };
+                    if(slider) slider.value = 110;
+                    break;
+                case 'warm': 
+                    currentFilterSettings = { saturate: 130, contrast: 100, blur: 0 };
+                    if(slider) slider.value = 105;
+                    break;
+                default: 
+                    currentFilterSettings = { saturate: 100, contrast: 100, blur: 0 };
+                    if(slider) slider.value = 100;
+            }
+            updateBrightnessControl();
         };
 
         async function openCameraModal() {
             document.getElementById('camera-modal').classList.remove('hidden');
             const video = document.getElementById('webcam-video');
             
-            // รีเซ็ตค่าเป็นหน้าปกติทุกครั้งที่เปิดกล้อง
-            setFilterPreset('normal', document.querySelector('.preset-btn'));
+            setFilterPreset('normal', document.querySelector('.filter-btn'));
 
             try {
-                // อัปเกรดความละเอียดวิดีโอเป็น HD (ถ้าอุปกรณ์รองรับ)
                 videoStream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: window.currentFacingMode || "user", width: { ideal: 1280 }, height: { ideal: 720 } } 
                 });
                 video.srcObject = videoStream;
-            } catch(e) { alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบสิทธิ์"); closeCameraModal(); }
+            } catch(e) { 
+                alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบสิทธิ์"); 
+                closeCameraModal(); 
+            }
         }
         
         function closeCameraModal() {
@@ -3045,14 +3321,12 @@
             const video = document.getElementById('webcam-video');
             const canvas = document.getElementById('webcam-canvas');
             
-            // อัปเกรดขนาดภาพบัตรให้ชัดเจนยิ่งขึ้น และตั้งอัตราส่วน 3:4 อัตโนมัติ
             const targetWidth = 600;
             const targetHeight = 800;
             canvas.width = targetWidth; 
             canvas.height = targetHeight; 
             const ctx = canvas.getContext('2d');
             
-            // ระบบ AI Auto-Crop (ตัดภาพให้อยู่ตรงกลางสมมาตรทุกครั้ง)
             const videoRatio = video.videoWidth / video.videoHeight;
             const targetRatio = targetWidth / targetHeight;
             let sx, sy, sW, sH;
@@ -3069,25 +3343,20 @@
                 sy = (video.videoHeight - sH) / 2;
             }
             
-            // ดึงค่าการตั้งค่าต่างๆ ของ Filter
-            const b = document.getElementById('brightness-slider').value;
-            const { saturate, contrast, blur } = window.currentFilterValues;
+            const b = document.getElementById('brightness-slider') ? document.getElementById('brightness-slider').value : 100;
+            const { saturate, contrast, blur } = currentFilterSettings;
             
             ctx.save();
-            // การสลับกล้องให้เหมือนกระจก (สำหรับกล้องหน้า)
             if (!window.currentFacingMode || window.currentFacingMode === 'user') {
                 ctx.translate(canvas.width, 0); 
                 ctx.scale(-1, 1);
             }
             
-            // 🔥 ฝัง (Bake) Filter และแสงสว่าง ลงในพิกเซลของภาพจริงๆ ก่อนเซฟ
             ctx.filter = `brightness(${b}%) saturate(${saturate}%) contrast(${contrast}%) blur(${blur}px)`;
             ctx.drawImage(video, sx, sy, sW, sH, 0, 0, canvas.width, canvas.height);
             ctx.restore();
             
             video.pause();
-            
-            // รีเซ็ต Filter ของ ctx ป้องกันผลกระทบตอนดึงรูปออก
             ctx.filter = 'none'; 
 
             document.getElementById('camera-controls').classList.add('hidden');
@@ -3099,9 +3368,8 @@
             document.getElementById('camera-controls').classList.remove('hidden');
             document.getElementById('snapshot-controls').classList.add('hidden');
         }
-        
+
         function confirmSnapshot() {
-            // บันทึกรูปเป็นไฟล์ JPEG ระดับสูง (0.85) ที่ฝังความสว่าง+ความสวยงามหน้าใสมาแล้ว
             const b64 = document.getElementById('webcam-canvas').toDataURL('image/jpeg', 0.85);
             document.getElementById('maker-photo').src = b64;
             document.getElementById('maker-photo').classList.remove('hidden');
@@ -3142,17 +3410,7 @@
                 }
             }
             
-            // ตรวจสอบประวัติเดิม เพื่อนำ ID และ เลขที่บัตร เดิมมาใช้ (หากเป็นการแก้ไข)
-            const existingHistoryIndex = allCardHistory.findIndex(h => h['เลขประจำตัวนักเรียน'] && h['เลขประจำตัวนักเรียน'].toString() === stuId.toString());
-            let historyId = new Date().getTime(); 
-            let currentRunNum = "Nscd " + String(allCardHistory.length + 1).padStart(4, '0');
-            
-            if (existingHistoryIndex > -1) {
-                historyId = allCardHistory[existingHistoryIndex].ID || historyId;
-                if (allCardHistory[existingHistoryIndex]['เลขที่บัตร']) {
-                    currentRunNum = allCardHistory[existingHistoryIndex]['เลขที่บัตร'];
-                }
-            }
+            const currentRunNum = "Nscd " + String(allCardHistory.length + 1).padStart(4, '0');
 
             const data = {
                 'เลขประจำตัวนักเรียน': stuId,
@@ -3161,27 +3419,23 @@
                 'สถานะการพิมพ์': 'ยังไม่พิมพ์',
                 'รูปถ่าย_Base64': photoBase64,
                 'เลขที่บัตร': currentRunNum,
-                'ID': historyId
+                'ID': new Date().getTime() 
             };
             
             try {
-                // อัปเดตใน UI แทนการสร้างใหม่หากมีประวัติอยู่แล้ว
-                if (existingHistoryIndex > -1) {
-                    allCardHistory[existingHistoryIndex] = data; // อัปเดตของเดิม
-                } else {
-                    allCardHistory.push(data); // เพิ่มใหม่ถ้าไม่มี
-                }
+                // เปลี่ยนหน้าจอให้เสร็จทันที (Instant UI Update ไม่รอฐานข้อมูล)
+                allCardHistory.push(data); 
 
                 issueQueueList = issueQueueList.filter(id => id.toString() !== stuId.toString());
                 renderIssueQueue();
                 renderCardHistory();
                 closeIssueModal();
                 
-                showToast('บันทึกและออกบัตรสำเร็จ! (กำลังอัปเดตระบบเบื้องหลัง)');
+                showToast('ออกบัตรสำเร็จ! (กำลังบันทึกลงระบบเบื้องหลัง)');
 
                 // ส่งเข้าชีทหลังบ้านเงียบๆ แบบไม่รอ
                 const dataForDB = { ...data };
-                // ส่ง ID ไปให้อัปเดตรายการเดิมได้ โดยไม่ต้อง delete dataForDB.ID แล้ว
+                delete dataForDB.ID;
                 postData('saveCardHistory', { data: dataForDB }).catch(e => console.warn(e));
                 
             } catch(e) {
@@ -3359,15 +3613,12 @@
 
             // จับคู่ประวัติกับข้อมูลนักเรียน
             let mappedData = pendingCards.map(h => {
-                // แก้ไขปัญหาการจับคู่ข้อมูล โดยบังคับเป็น Text และตัดช่องว่างซ้ายขวาทิ้ง (Trim)
-                const searchId = String(h['เลขประจำตัวนักเรียน'] || '').trim();
-                const stu = allStudents.find(s => String(s['เลขประจำตัว'] || '').trim() === searchId) || {};
-                
+                const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === h['เลขประจำตัวนักเรียน'].toString()) || {};
                 return {
                     history: h,
                     student: stu,
-                    classRoom: stu['ชั้น/ห้อง'] || '-',
-                    cardNo: h['เลขที่บัตร'] || '-'
+                    classRoom: stu['ชั้น/ห้อง'] || '',
+                    cardNo: h['เลขที่บัตร'] || ''
                 };
             });
 
@@ -3388,16 +3639,15 @@
                 tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">ไม่มีรายการบัตรรอพิมพ์ในระบบ</td></tr>';
             } else {
                 mappedData.forEach(d => {
-                    // หากหาข้อมูลใน allStudents ไม่เจอ จะแสดงข้อความเตือนให้ทราบ
                     const stuId = d.student['เลขประจำตัว'] || d.history['เลขประจำตัวนักเรียน'];
-                    const name = d.student['ชื่อ-สกุล'] || '<span class="text-red-500 italic">ไม่พบข้อมูล (กดอัปเดต)</span>';
+                    const name = d.student['ชื่อ-สกุล'] || '-';
                     tbody.innerHTML += `
                         <tr class="hover:bg-blue-50">
                             <td class="p-2 text-center"><input type="checkbox" class="chk-print-queue" value="${stuId}"></td>
                             <td class="p-2 font-medium text-gray-600">${d.cardNo}</td>
                             <td class="p-2">${stuId}</td>
                             <td class="p-2">${name}</td>
-                            <td class="p-2 text-center">${d.classRoom}</td>
+                            <td class="p-2">${d.classRoom}</td>
                         </tr>`;
                 });
             }
@@ -3416,28 +3666,11 @@
             let qrTasks = [];
             
             selected.forEach(id => {
-                // แก้ไขการเปรียบเทียบ ID 
-                const searchId = String(id).trim();
-                const stu = allStudents.find(s => String(s['เลขประจำตัว']).trim() === searchId);
-                
+                const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
                 if(stu) {
-                    const cardData = generateCardHTML(stu, 'queue');
+                    const cardData = generateCardHTML(stu, 'group');
                     htmlStr += cardData.html;
                     qrTasks.push(cardData);
-                } else {
-                    // เผื่อกรณีข้อมูลนักเรียนโดนลบ แต่ประวัติการขอทำบัตรยังค้างอยู่ ให้พิมพ์ข้อมูลเปล่าๆ ได้
-                    const history = allCardHistory.find(h => String(h['เลขประจำตัวนักเรียน']).trim() === searchId);
-                    if(history) {
-                        const fakeStu = {
-                             'เลขประจำตัว': history['เลขประจำตัวนักเรียน'],
-                             'ชื่อ-สกุล': 'ไม่มีข้อมูลในระบบ',
-                             'ชั้น/ห้อง': '',
-                             'รูปถ่าย_Base64': history['รูปถ่าย_Base64'] || ''
-                        };
-                        const cardData = generateCardHTML(fakeStu, 'queue');
-                        htmlStr += cardData.html;
-                        qrTasks.push(cardData);
-                    }
                 }
             });
             
@@ -3551,7 +3784,6 @@
                             let text = el.text;
                             if (el.field === '[ชื่อ-สกุล]') text = studentData['ชื่อ-สกุล'] || '';
                             else if (el.field === '[เลขประจำตัว]') text = studentData['เลขประจำตัว'] || '';
-                            else if (el.field === '[เลขประจำตัวประชาชน]') text = studentData['เลขประจำตัวประชาชน'] || '';
                             else if (el.field === '[เลขที่บัตร]') text = runningNumberStr;
                             else if (el.field === '[ชั้น/ห้อง]') text = studentData['ชั้น/ห้อง'] || '';
                             else if (el.field === '[แผนการเรียน]') text = studentData['แผนการเรียน'] || '';
