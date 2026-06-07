@@ -2556,8 +2556,9 @@
 
             let html = '';
             renderData.forEach(s => {
-                // ใช้ loading="lazy" ป้องกันการโหลดรูปพร้อมกันเยอะๆ จน RAM เต็ม
-                const img = s['รูปถ่าย_Base64'] ? `<img src="${s['รูปถ่าย_Base64']}" class="w-10 h-10 object-cover rounded-full border" loading="lazy">` : '<div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center"><i class="fas fa-user text-gray-400"></i></div>';
+                // แก้ไข 1: เพิ่ม onerror ในตาราง หากโหลดลิงก์รูปไม่ขึ้นให้แสดงรูปภาพสำรองแทนไอคอนแตก
+                const photoSrc = s['รูปถ่าย_Base64'] ? s['รูปถ่าย_Base64'].toString().trim() : '';
+                const img = photoSrc ? `<img src="${photoSrc}" class="w-10 h-10 object-cover rounded-full border" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/40?text=No+Img';">` : '<div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center"><i class="fas fa-user text-gray-400"></i></div>';
                 
                 html += `
                     <tr class="hover:bg-gray-50">
@@ -2669,14 +2670,29 @@
             
             document.getElementById('stu-parent').value = s['ชื่อผู้ปกครอง'];
             document.getElementById('stu-parent-tel').value = s['เบอร์ผู้ปกครอง'];
-            if(s['รูปถ่าย_Base64']) {
-                document.getElementById('stu-photo-preview').src = s['รูปถ่าย_Base64'];
-                document.getElementById('stu-photo-preview').classList.remove('hidden');
-                document.getElementById('stu-photo-icon').classList.add('hidden');
-                document.getElementById('stu-photo-base64').value = s['รูปถ่าย_Base64'];
+            
+            // แก้ไข 2: เพิ่มการดักจับรูปแตกในฟอร์มแก้ไขข้อมูลนักเรียน
+            const photoSrc = s['รูปถ่าย_Base64'] ? s['รูปถ่าย_Base64'].toString().trim() : '';
+            const previewImg = document.getElementById('stu-photo-preview');
+            const photoIcon = document.getElementById('stu-photo-icon');
+            
+            if(photoSrc) {
+                previewImg.src = photoSrc;
+                previewImg.classList.remove('hidden');
+                photoIcon.classList.add('hidden');
+                document.getElementById('stu-photo-base64').value = photoSrc;
+                
+                // ดักจับรูปแตก ถ้าลิงก์เสียให้กลับไปโชว์ไอคอนสีแดงแทน
+                previewImg.onerror = function() {
+                     this.onerror = null;
+                     this.classList.add('hidden');
+                     photoIcon.className = "fas fa-user-slash text-4xl text-red-300";
+                     photoIcon.classList.remove('hidden');
+                };
             } else {
-                 document.getElementById('stu-photo-preview').classList.add('hidden');
-                 document.getElementById('stu-photo-icon').classList.remove('hidden');
+                 previewImg.classList.add('hidden');
+                 photoIcon.className = "fas fa-user text-4xl text-gray-300";
+                 photoIcon.classList.remove('hidden');
                  document.getElementById('stu-photo-base64').value = '';
             }
             
@@ -2767,206 +2783,40 @@
         }
 
         // ==========================================
-        // ระบบรายงานนักเรียนที่ยังไม่ขึ้นระเบียน (เช็คจาก วันเดือนปีเกิด)
+        // ระบบรายงานนักเรียนที่ไม่มีรูปถ่าย (อัปเดต: ตรวจสอบข้อมูลจากชีทโดยตรง)
         // ==========================================
-        window.openMissingRegReport = function() {
-            const modal = document.getElementById('missing-reg-modal');
-            const contentArea = document.getElementById('missing-reg-content');
-            
-            if (!modal || !contentArea) {
-                showToast('ไม่พบโครงสร้างรายงานในระบบ กรุณารีเฟรชหน้าเว็บ', true);
-                return;
-            }
-            
-            // กรองนักเรียนที่ไม่มีข้อมูล "วันเกิด" *และ* ต้องระบุ "ชั้น/ห้อง" แล้วเท่านั้น
-            const missingRegs = allStudents.filter(s => {
-                const hasNoDob = !s['วันเกิด'] || s['วันเกิด'].toString().trim() === '';
-                const hasClass = s['ชั้น/ห้อง'] && s['ชั้น/ห้อง'].toString().trim() !== '';
-                return hasNoDob && hasClass;
-            });
-            
-            if (missingRegs.length === 0) {
-                contentArea.innerHTML = `
-                    <div class="text-center py-12">
-                        <i class="fas fa-check-circle text-6xl text-green-500 mb-4 block"></i>
-                        <h4 class="text-xl font-bold text-gray-800">ข้อมูลครบถ้วน!</h4>
-                        <p class="text-gray-600 mt-2">นักเรียนในระบบทุกคนขึ้นระเบียนและมีวันเดือนปีเกิดครบถ้วน</p>
-                    </div>`;
-            } else {
-                const groupedByClass = {};
-                missingRegs.forEach(s => {
-                    const classRoom = s['ชั้น/ห้อง'];
-                    if (!groupedByClass[classRoom]) groupedByClass[classRoom] = [];
-                    groupedByClass[classRoom].push(s);
-                });
-
-                const sortedClasses = Object.keys(groupedByClass).sort();
-                
-                let html = `
-                    <div class="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-6 text-center shadow-inner">
-                        <p class="text-gray-600 font-medium">พบนักเรียนที่ยังไม่ขึ้นระเบียนทั้งหมด</p>
-                        <p class="text-4xl font-bold text-orange-600 my-1">${missingRegs.length} <span class="text-base font-normal text-gray-600">คน</span></p>
-                        <p class="text-xs text-gray-400">กรุณาเพิ่มวันเดือนปีเกิดเพื่อขึ้นระเบียนให้สมบูรณ์</p>
-                    </div>
-                    <div class="space-y-4">
-                `;
-                
-                sortedClasses.forEach(cr => {
-                    html += `
-                    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                        <div class="bg-gray-50 p-3 font-bold text-nara-blue border-b flex justify-between items-center text-sm md:text-base">
-                            <span><i class="fas fa-users mr-2 text-gray-400"></i>ชั้น/ห้อง: ${cr}</span>
-                            <span class="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-xs font-bold">${groupedByClass[cr].length} คน</span>
-                        </div>
-                        <ul class="divide-y divide-gray-100 max-h-60 overflow-y-auto hide-scroll">
-                    `;
-                    
-                    groupedByClass[cr].forEach(s => {
-                        html += `
-                            <li class="p-3 text-sm flex justify-between items-center hover:bg-orange-50 transition">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400"><i class="fas fa-calendar-times text-xs"></i></div>
-                                    <div>
-                                        <p class="font-bold text-gray-800 text-xs md:text-sm">${s['เลขประจำตัว']}</p>
-                                        <p class="text-gray-500 text-xs">${s['ชื่อ-สกุล']}</p>
-                                    </div>
-                                </div>
-                                <button onclick="fixMissingReg('${s['เลขประจำตัว']}')" class="text-xs bg-white text-orange-600 border border-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-50 hover:shadow-sm transition font-medium"><i class="fas fa-edit mr-1"></i> เพิ่มวันเกิด</button>
-                            </li>
-                        `;
-                    });
-                    
-                    html += `</ul></div>`;
-                });
-                html += `</div>`;
-                contentArea.innerHTML = html;
-            }
-            
-            modal.classList.remove('hidden');
-        }
-
-        window.closeMissingRegReport = function() {
-            document.getElementById('missing-reg-modal').classList.add('hidden');
-        }
-
-        // พิมพ์รายงานนักเรียนที่ยังไม่ขึ้นระเบียนเป็น PDF
-        window.printMissingRegReport = function() {
-            const missingRegs = allStudents.filter(s => {
-                const hasNoDob = !s['วันเกิด'] || s['วันเกิด'].toString().trim() === '';
-                const hasClass = s['ชั้น/ห้อง'] && s['ชั้น/ห้อง'].toString().trim() !== '';
-                return hasNoDob && hasClass;
-            });
-
-            if (missingRegs.length === 0) {
-                showToast('ไม่มีข้อมูลนักเรียนที่ยังไม่ขึ้นระเบียนสำหรับพิมพ์', true);
-                return;
-            }
-
-            const groupedByClass = {};
-            missingRegs.forEach(s => {
-                const classRoom = s['ชั้น/ห้อง'];
-                if (!groupedByClass[classRoom]) groupedByClass[classRoom] = [];
-                groupedByClass[classRoom].push(s);
-            });
-
-            const sortedClasses = Object.keys(groupedByClass).sort();
-
-            let reportHTML = `
-                <!DOCTYPE html>
-                <html lang="th">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>รายงานนักเรียนที่ยังไม่ขึ้นระเบียน</title>
-                    <style>
-                        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap');
-                        body { font-family: 'Prompt', sans-serif; padding: 30px; color: #333; background: #fff; line-height: 1.5; }
-                        h1 { text-align: center; color: #ea580c; margin-bottom: 5px; font-size: 24px;}
-                        .school-name { text-align: center; color: #555; margin-bottom: 20px; font-size: 16px;}
-                        .summary { text-align: center; font-size: 16px; margin-bottom: 30px; padding: 10px; background: #fff7ed; color: #c2410c; border-radius: 8px; font-weight: bold;}
-                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;}
-                        th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
-                        th { background-color: #f8fafc; font-weight: 600; color: #ea580c; }
-                        .class-header { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #1e3a8a; border-left: 4px solid #ea580c; padding-left: 10px;}
-                        .print-date { text-align: right; font-size: 12px; color: #666; margin-bottom: 20px;}
-                    </style>
-                </head>
-                <body>
-                    <h1>รายงานนักเรียนที่ยังไม่ขึ้นระเบียน</h1>
-                    <div class="school-name">${systemSettings.schoolName || 'โรงเรียนนราสิกขาลัย'}</div>
-                    <div class="print-date">ข้อมูลพิมพ์ ณ วันที่: ${new Date().toLocaleString('th-TH')}</div>
-                    <div class="summary">สรุปยอด: พบนักเรียนที่ยังไม่ขึ้นระเบียน จำนวน ${missingRegs.length} คน</div>
-            `;
-
-            sortedClasses.forEach(cr => {
-                reportHTML += `<div class="class-header">ระดับชั้น/ห้อง: ${cr} (จำนวน ${groupedByClass[cr].length} คน)</div>`;
-                reportHTML += `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th width="15%" style="text-align:center;">ลำดับ</th>
-                                <th width="30%">เลขประจำตัว</th>
-                                <th width="55%">ชื่อ-นามสกุล</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                groupedByClass[cr].forEach((s, index) => {
-                    reportHTML += `
-                        <tr>
-                            <td style="text-align:center;">${index + 1}</td>
-                            <td>${s['เลขประจำตัว']}</td>
-                            <td>${s['ชื่อ-สกุล']}</td>
-                        </tr>
-                    `;
-                });
-                reportHTML += `</tbody></table>`;
-            });
-
-            reportHTML += `
-                    <script>
-                        window.onload = function() {
-                            setTimeout(function() { window.print(); }, 500);
-                        };
-                    <\/script>
-                </body>
-                </html>
-            `;
-
-            const printWin = window.open('', '_blank');
-            if (printWin) {
-                printWin.document.write(reportHTML);
-                printWin.document.close();
-            } else {
-                showToast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาต Pop-up', true);
-            }
-        }
-
-        window.fixMissingReg = function(stuId) {
-            closeMissingRegReport();
-            nav('menu-students');
-            setTimeout(() => {
-                document.getElementById('search-stu-input').value = stuId;
-                searchStudentDB();
-                editStudentById(stuId);
-                showToast('ระบบได้เตรียมฟอร์มข้อมูลของนักเรียนรหัส ' + stuId + ' ให้เรียบร้อยแล้ว');
-                if(document.getElementById('stu-dob')) {
-                    document.getElementById('stu-dob').focus();
-                }
-            }, 300);
-        }
-
-        // ==========================================
-        // ระบบรายงานนักเรียนที่ไม่มีรูปถ่าย (อันเดิมของคุณ คงไว้ไม่ตัดทอน)
-        // ==========================================
-        window.openMissingPhotoReport = function() {
+        window.openMissingPhotoReport = async function() {
             const modal = document.getElementById('missing-photo-modal');
             const contentArea = document.getElementById('missing-photo-content');
             
+            // แสดงหน้าโหลดเพื่อบอกผู้ใช้ว่ากำลังดึงข้อมูลสดๆ จากชีท
+            showLoading();
+            document.getElementById('loading-msg').innerText = "กำลังดึงข้อมูลรูปล่าสุดจากชีทโดยตรง...";
+            
+            try {
+                // บังคับดึงข้อมูลล่าสุดจาก Google Sheets ทั้ง 2 ชีท ก่อนทำงาน
+                const [resStu, resHis] = await Promise.all([
+                    fetchJSONP('getStudents', {}, 60000),
+                    fetchJSONP('getCardHistory', {}, 60000)
+                ]);
+                
+                // อัปเดตความจำในระบบให้เป็นข้อมูลสดใหม่
+                if (resStu.status === 'success') allStudents = resStu.data || [];
+                if (resHis.status === 'success') allCardHistory = resHis.data || [];
+                
+                // สั่งรีเฟรชตารางนักเรียนหน้าจอหลักไปด้วยเลย
+                searchStudentDB();
+            } catch (e) {
+                showToast('เชื่อมต่อชีทไม่สำเร็จ ระบบจะใช้ข้อมูลล่าสุดในเครื่องแทน', true);
+            }
+            hideLoading();
+
             // 1. รวบรวมรหัสนักเรียนทั้งหมด "ที่มีรูปถ่ายแล้ว" ไม่ว่าจะซ้ำกี่รายการก็ตาม
             const idsWithPhoto = new Set();
             
             // ตรวจสอบจากฐานข้อมูลนักเรียน
             allStudents.forEach(s => {
+                // รองรับทั้งกรณีที่เป็น Base64 จริงๆ, ลิงก์, หรือข้อความ 'HAS_BASE64'
                 if (s['รูปถ่าย_Base64'] && s['รูปถ่าย_Base64'].trim() !== '') {
                     if (s['เลขประจำตัว']) idsWithPhoto.add(s['เลขประจำตัว'].toString());
                 }
@@ -3212,6 +3062,193 @@
             }
         }
 
+        let lastMissingPhotos = []; // เก็บแคชไว้สำหรับปริ้นท์
+
+        // ==========================================
+        // ระบบรายงานนักเรียนที่ไม่มีรูปถ่าย (ตรวจสอบในชีทโดยตรง ไม่โหลดรูป)
+        // ==========================================
+        window.openMissingPhotoReport = async function() {
+            const modal = document.getElementById('missing-photo-modal');
+            const contentArea = document.getElementById('missing-photo-content');
+            
+            showLoading();
+            document.getElementById('loading-msg').innerText = "กำลังตรวจสอบฐานข้อมูลโดยตรง...";
+            
+            try {
+                // เรียก API ใหม่ที่เช็คจากหลังบ้านโดยไม่ดึง Base64 กลับมา
+                const res = await fetchJSONP('checkMissingPhotos', {}, 60000);
+                
+                if (res.status !== 'success') throw new Error('API Error');
+                
+                const missingPhotos = res.data || [];
+                lastMissingPhotos = missingPhotos;
+                
+                if (missingPhotos.length === 0) {
+                    contentArea.innerHTML = `
+                        <div class="text-center py-12">
+                            <i class="fas fa-check-circle text-6xl text-green-500 mb-4 block"></i>
+                            <h4 class="text-xl font-bold text-gray-800">ข้อมูลครบถ้วน!</h4>
+                            <p class="text-gray-600 mt-2">นักเรียนในระบบทุกคนมีรูปถ่ายเรียบร้อยแล้ว</p>
+                        </div>`;
+                } else {
+                    const groupedByClass = {};
+                    missingPhotos.forEach(s => {
+                        const classRoom = s['ชั้น/ห้อง'] || 'ไม่ระบุชั้น/ห้อง';
+                        if (!groupedByClass[classRoom]) groupedByClass[classRoom] = [];
+                        groupedByClass[classRoom].push(s);
+                    });
+
+                    const sortedClasses = Object.keys(groupedByClass).sort();
+                    
+                    let html = `
+                        <div class="bg-red-50 border border-red-200 p-4 rounded-xl mb-6 text-center shadow-inner">
+                            <p class="text-gray-600 font-medium">พบนักเรียนที่ยังไม่มีรูปถ่ายทั้งหมด</p>
+                            <p class="text-4xl font-bold text-red-600 my-1">${missingPhotos.length} <span class="text-base font-normal text-gray-600">คน</span></p>
+                            <p class="text-xs text-gray-400">ประมวลผลจากฐานข้อมูลโดยตรง (ไม่โหลดรูปมาที่หน้าเว็บ)</p>
+                        </div>
+                        <div class="space-y-4">
+                    `;
+                    
+                    sortedClasses.forEach(cr => {
+                        html += `
+                        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                            <div class="bg-gray-50 p-3 font-bold text-nara-blue border-b flex justify-between items-center text-sm md:text-base">
+                                <span><i class="fas fa-users mr-2 text-gray-400"></i>ชั้น/ห้อง: ${cr}</span>
+                                <span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold">${groupedByClass[cr].length} คน</span>
+                            </div>
+                            <ul class="divide-y divide-gray-100 max-h-60 overflow-y-auto hide-scroll">
+                        `;
+                        
+                        groupedByClass[cr].forEach(s => {
+                            html += `
+                                <li class="p-3 text-sm flex justify-between items-center hover:bg-blue-50 transition">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400"><i class="fas fa-user text-xs"></i></div>
+                                        <div>
+                                            <p class="font-bold text-gray-800 text-xs md:text-sm">${s['เลขประจำตัว']}</p>
+                                            <p class="text-gray-500 text-xs">${s['ชื่อ-สกุล']}</p>
+                                        </div>
+                                    </div>
+                                    <button onclick="fixMissingPhoto('${s['เลขประจำตัว']}')" class="text-xs bg-white text-nara-blue border border-blue-300 px-3 py-1.5 rounded-lg hover:bg-blue-50 hover:shadow-sm transition font-medium"><i class="fas fa-camera mr-1"></i> เพิ่มรูป</button>
+                                </li>
+                            `;
+                        });
+                        
+                        html += `</ul></div>`;
+                    });
+                    html += `</div>`;
+                    contentArea.innerHTML = html;
+                }
+                
+                modal.classList.remove('hidden');
+            } catch (e) {
+                showToast('เชื่อมต่อฐานข้อมูลล้มเหลว', true);
+            }
+            hideLoading();
+        }
+
+        window.closeMissingPhotoReport = function() {
+            document.getElementById('missing-photo-modal').classList.add('hidden');
+        }
+
+        window.printMissingPhotoReport = function() {
+            const missingPhotos = lastMissingPhotos || [];
+
+            if (missingPhotos.length === 0) {
+                showToast('ไม่มีข้อมูลนักเรียนที่ขาดรูปถ่ายสำหรับพิมพ์', true);
+                return;
+            }
+
+            const groupedByClass = {};
+            missingPhotos.forEach(s => {
+                const classRoom = s['ชั้น/ห้อง'] || 'ไม่ระบุชั้น/ห้อง';
+                if (!groupedByClass[classRoom]) groupedByClass[classRoom] = [];
+                groupedByClass[classRoom].push(s);
+            });
+
+            const sortedClasses = Object.keys(groupedByClass).sort();
+
+            let reportHTML = `
+                <!DOCTYPE html>
+                <html lang="th">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>รายงานนักเรียนที่ยังไม่มีรูปถ่าย</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap');
+                        body { font-family: 'Prompt', sans-serif; padding: 30px; color: #333; background: #fff; line-height: 1.5; }
+                        h1 { text-align: center; color: #1e3a8a; margin-bottom: 5px; font-size: 24px;}
+                        .school-name { text-align: center; color: #555; margin-bottom: 20px; font-size: 16px;}
+                        .summary { text-align: center; font-size: 16px; margin-bottom: 30px; padding: 10px; background: #fee2e2; color: #b91c1c; border-radius: 8px; font-weight: bold;}
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;}
+                        th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+                        th { background-color: #f1f5f9; font-weight: 600; color: #1e3a8a; }
+                        .class-header { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #1e3a8a; border-left: 4px solid #1e3a8a; padding-left: 10px;}
+                        .print-date { text-align: right; font-size: 12px; color: #666; margin-bottom: 20px;}
+                    </style>
+                </head>
+                <body>
+                    <h1>รายงานการตรวจสอบรูปถ่ายนักเรียน</h1>
+                    <div class="school-name">${systemSettings.schoolName || 'โรงเรียนนราสิกขาลัย'}</div>
+                    <div class="print-date">ข้อมูลพิมพ์ ณ วันที่: ${new Date().toLocaleString('th-TH')}</div>
+                    <div class="summary">สรุปยอด: พบนักเรียนที่ยังไม่มีรูปถ่ายในระบบ จำนวน ${missingPhotos.length} คน</div>
+            `;
+
+            sortedClasses.forEach(cr => {
+                reportHTML += `<div class="class-header">ระดับชั้น/ห้อง: ${cr} (จำนวน ${groupedByClass[cr].length} คน)</div>`;
+                reportHTML += `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="15%" style="text-align:center;">ลำดับ</th>
+                                <th width="30%">เลขประจำตัว</th>
+                                <th width="55%">ชื่อ-นามสกุล</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                groupedByClass[cr].forEach((s, index) => {
+                    reportHTML += `
+                        <tr>
+                            <td style="text-align:center;">${index + 1}</td>
+                            <td>${s['เลขประจำตัว']}</td>
+                            <td>${s['ชื่อ-สกุล']}</td>
+                        </tr>
+                    `;
+                });
+                reportHTML += `</tbody></table>`;
+            });
+
+            reportHTML += `
+                    <script>
+                        window.onload = function() {
+                            setTimeout(function() { window.print(); }, 500);
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `;
+
+            const printWin = window.open('', '_blank');
+            if (printWin) {
+                printWin.document.write(reportHTML);
+                printWin.document.close();
+            } else {
+                showToast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาต Pop-up', true);
+            }
+        }
+
+        window.fixMissingPhoto = function(stuId) {
+            closeMissingPhotoReport();
+            nav('menu-students');
+            setTimeout(() => {
+                document.getElementById('search-stu-input').value = stuId;
+                searchStudentDB();
+                editStudentById(stuId);
+                showToast('ระบบได้เตรียมฟอร์มข้อมูลของนักเรียนรหัส ' + stuId + ' ให้เรียบร้อยแล้ว');
+            }, 300);
+        }
+
         // --- Card Making & Camera ---
         let issueQueueList = [];
 
@@ -3407,14 +3444,28 @@
             // เรียกใช้ฟังก์ชันคำนวณอายุที่แม่นยำแทน
             document.getElementById('m-age').value = calculatePreciseAge(s['วันเกิด']);
             
-            if(s['รูปถ่าย_Base64']) {
-                document.getElementById('maker-photo').src = s['รูปถ่าย_Base64'];
-                document.getElementById('maker-photo').classList.remove('hidden');
-                document.getElementById('maker-photo-icon').classList.add('hidden');
-                document.getElementById('maker-photo-base64').value = s['รูปถ่าย_Base64'];
+            // แก้ไข 3: เพิ่มการดักจับรูปแตกในหน้าตรวจสอบและออกบัตร (Modal)
+            const photoSrc = s['รูปถ่าย_Base64'] ? s['รูปถ่าย_Base64'].toString().trim() : '';
+            const makerImg = document.getElementById('maker-photo');
+            const makerIcon = document.getElementById('maker-photo-icon');
+            
+            if(photoSrc) {
+                makerImg.src = photoSrc;
+                makerImg.classList.remove('hidden');
+                makerIcon.classList.add('hidden');
+                document.getElementById('maker-photo-base64').value = photoSrc;
+                
+                // ดักจับรูปแตก ถ้าลิงก์เสียให้กลับไปโชว์ไอคอนสีแดงแทน
+                makerImg.onerror = function() {
+                     this.onerror = null;
+                     this.classList.add('hidden');
+                     makerIcon.className = "fas fa-user-slash text-4xl text-red-300";
+                     makerIcon.classList.remove('hidden');
+                };
             } else {
-                document.getElementById('maker-photo').classList.add('hidden');
-                document.getElementById('maker-photo-icon').classList.remove('hidden');
+                makerImg.classList.add('hidden');
+                makerIcon.className = "fas fa-user text-4xl text-gray-300";
+                makerIcon.classList.remove('hidden');
                 document.getElementById('maker-photo-base64').value = '';
             }
 
@@ -3746,13 +3797,21 @@
         }
 
         // ฟังก์ชันสำหรับสั่งพิมพ์จากหน้าประวัติโดยตรง (กรณีบัตรชำรุด/สูญหาย)
-        function printFromHistory(id) {
+        async function printFromHistory(id) {
             if(!id) return;
+            
             showLoading();
+            document.getElementById('loading-msg').innerText = "กำลังดึงรูปภาพเพื่อสร้างตัวอย่างบัตร...";
+            
             try {
                 const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
                 
                 if(stu) {
+                    if (stu['รูปถ่าย_Base64'] === 'HAS_BASE64') {
+                        const photos = await fetchPhotosForStudents([id]);
+                        stu['รูปถ่าย_Base64'] = photos[id] || '';
+                    }
+
                     const renderArea = document.getElementById('print-preview-content');
                     renderArea.innerHTML = '';
                     
@@ -3946,13 +4005,6 @@
                         let fw = el.fontWeight || 'bold';
                         if (fw === '400') fw = 'normal';
                         if (fw === '700' || fw === 'bold') fw = 'bold';
-                        styleStr += ` font-weight:${fw};`;
-
-                        if(el.textAlign) styleStr += ` text-align:${el.textAlign};`;
-                        
-                        if(el.borderColor) {
-                            styleStr += ` border-color:${el.borderColor}; border-width:${el.borderWidth||'2px'}; border-style:${el.borderStyle||'solid'};`;
-                        }
                         if(el.borderRadius) {
                             styleStr += ` border-radius:${el.borderRadius}; overflow:hidden;`;
                         }
@@ -3964,6 +4016,12 @@
                             if (!photoUrl && historyRecord && historyRecord['รูปถ่าย_Base64']) {
                                 photoUrl = historyRecord['รูปถ่าย_Base64'];
                             }
+                            
+                            photoUrl = photoUrl ? photoUrl.toString().trim() : '';
+                            if (photoUrl && photoUrl.includes('/file/d/')) {
+                                const match = photoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                                if (match) photoUrl = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+                            }
                             photoUrl = photoUrl || 'https://via.placeholder.com/150';
                             
                             // ป้องกันกรณีผู้ใช้ลบขนาดกล่องรูปทิ้ง ให้มีขนาดพื้นฐานเสมอ
@@ -3971,7 +4029,7 @@
                             if(!el.borderColor) styleStr += ` border:1px solid #ccc;`;
                             styleStr += ` background:#eee; z-index: 10;`;
                             
-                            content = `<img src="${photoUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit; display:block;">`;
+                            content = `<img src="${photoUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit; display:block;" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=Image+Error';">`;
                             
                         } else if (el.type === 'qr' || el.field === '[QR Code]') {
                             styleStr += ` background:white; padding:2px; z-index: 10;`;
