@@ -740,14 +740,24 @@
                 <!-- 6. พิมพ์บัตรนักเรียน -->
                 <div id="menu-printcard" class="content-section hidden">
                     
-                    <div class="flex justify-between items-center border-b mb-6">
-                        <div class="flex">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b mb-6 gap-4">
+                        <div class="flex flex-wrap">
                             <button onclick="switchTabPrint('print-tab1')" id="btn-print-tab1" class="px-6 py-2 border-b-2 border-nara-blue text-nara-blue font-bold">พิมพ์รายบุคคล</button>
                             <button onclick="switchTabPrint('print-tab2')" id="btn-print-tab2" class="px-6 py-2 border-b-2 border-transparent text-gray-500 hover:text-nara-blue">พิมพ์เป็นกลุ่ม</button>
                             <!-- ปุ่มแท็บ คิวรอดำเนินการพิมพ์ -->
                             <button onclick="switchTabPrint('print-tab3')" id="btn-print-tab3" class="px-6 py-2 border-b-2 border-transparent text-gray-500 hover:text-nara-blue">คิวรอดำเนินการพิมพ์</button>
                         </div>
-                        <button onclick="refreshPrintData()" class="text-sm bg-nara-yellow text-nara-blue px-3 py-1 rounded shadow hover:bg-yellow-500 mb-2"><i class="fas fa-sync"></i> อัปเดตข้อมูลล่าสุด</button>
+                        <!-- เพิ่มไอคอนแสดงสถานะการซิงค์ข้อมูลที่มุมขวาบนตรงนี้ -->
+                        <div class="flex items-center gap-3 self-end sm:self-auto pb-2 sm:pb-0">
+                            <div id="print-sync-status-indicator" class="flex items-center gap-2 text-xs font-semibold bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200 transition-all duration-300">
+                                <span class="relative flex h-2 w-2">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span id="print-sync-dot" class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                                <span id="print-sync-text">เชื่อมต่อฐานข้อมูลแล้ว</span>
+                            </div>
+                            <button onclick="refreshPrintData()" class="text-sm bg-nara-yellow text-nara-blue font-bold px-3 py-1.5 rounded-lg shadow hover:bg-yellow-500 transition flex items-center gap-1"><i id="print-sync-btn-icon" class="fas fa-sync"></i> อัปเดตข้อมูลล่าสุด</button>
+                        </div>
                     </div>
 
                     <!-- Tab พิมพ์เดี่ยว -->
@@ -3062,6 +3072,209 @@
             }
         }
 
+        // ==========================================
+        // ระบบรายงานนักเรียนที่ยังไม่ขึ้นระเบียน (เช็คจาก วันเดือนปีเกิด)
+        // ==========================================
+        window.openMissingRegReport = function() {
+            const modal = document.getElementById('missing-reg-modal');
+            const contentArea = document.getElementById('missing-reg-content');
+            
+            if (!modal || !contentArea) {
+                showToast('ไม่พบโครงสร้างรายงานในระบบ กรุณารีเฟรชหน้าเว็บ', true);
+                return;
+            }
+            
+            // กรองนักเรียนที่ไม่มีข้อมูล "วันเกิด" *และ* ต้องระบุ "ชั้น/ห้อง" แล้วเท่านั้น
+            const missingRegs = allStudents.filter(s => {
+                const hasNoDob = !s['วันเกิด'] || s['วันเกิด'].toString().trim() === '';
+                const hasClass = s['ชั้น/ห้อง'] && s['ชั้น/ห้อง'].toString().trim() !== '';
+                return hasNoDob && hasClass;
+            });
+            
+            if (missingRegs.length === 0) {
+                contentArea.innerHTML = `
+                    <div class="text-center py-12">
+                        <i class="fas fa-check-circle text-6xl text-green-500 mb-4 block"></i>
+                        <h4 class="text-xl font-bold text-gray-800">ข้อมูลครบถ้วน!</h4>
+                        <p class="text-gray-600 mt-2">นักเรียนในระบบทุกคนขึ้นระเบียนและมีวันเดือนปีเกิดครบถ้วน</p>
+                    </div>`;
+            } else {
+                const groupedByClass = {};
+                missingRegs.forEach(s => {
+                    const classRoom = s['ชั้น/ห้อง'];
+                    if (!groupedByClass[classRoom]) groupedByClass[classRoom] = [];
+                    groupedByClass[classRoom].push(s);
+                });
+
+                const sortedClasses = Object.keys(groupedByClass).sort();
+                
+                let html = `
+                    <div class="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-6 text-center shadow-inner">
+                        <p class="text-gray-600 font-medium">พบนักเรียนที่ยังไม่ขึ้นระเบียนทั้งหมด</p>
+                        <p class="text-4xl font-bold text-orange-600 my-1">${missingRegs.length} <span class="text-base font-normal text-gray-600">คน</span></p>
+                        <p class="text-xs text-gray-400">กรุณาเพิ่มวันเดือนปีเกิดเพื่อขึ้นระเบียนให้สมบูรณ์</p>
+                    </div>
+                    <div class="space-y-4">
+                `;
+                
+                sortedClasses.forEach(cr => {
+                    html += `
+                    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                        <div class="bg-gray-50 p-3 font-bold text-nara-blue border-b flex justify-between items-center text-sm md:text-base">
+                            <span><i class="fas fa-users mr-2 text-gray-400"></i>ชั้น/ห้อง: ${cr}</span>
+                            <span class="bg-orange-100 text-orange-600 px-3 py-1 rounded-full text-xs font-bold">${groupedByClass[cr].length} คน</span>
+                        </div>
+                        <ul class="divide-y divide-gray-100 max-h-60 overflow-y-auto hide-scroll">
+                    `;
+                    
+                    groupedByClass[cr].forEach(s => {
+                        html += `
+                            <li class="p-3 text-sm flex justify-between items-center hover:bg-orange-50 transition">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400"><i class="fas fa-calendar-times text-xs"></i></div>
+                                    <div>
+                                        <p class="font-bold text-gray-800 text-xs md:text-sm">${s['เลขประจำตัว']}</p>
+                                        <p class="text-gray-500 text-xs">${s['ชื่อ-สกุล']}</p>
+                                    </div>
+                                </div>
+                                <button onclick="fixMissingReg('${s['เลขประจำตัว']}')" class="text-xs bg-white text-orange-600 border border-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-50 hover:shadow-sm transition font-medium"><i class="fas fa-edit mr-1"></i> เพิ่มวันเกิด</button>
+                            </li>
+                        `;
+                    });
+                    
+                    html += `</ul></div>`;
+                });
+                html += `</div>`;
+                contentArea.innerHTML = html;
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        window.closeMissingRegReport = function() {
+            document.getElementById('missing-reg-modal').classList.add('hidden');
+        }
+
+        window.printMissingRegReport = function() {
+            const missingRegs = allStudents.filter(s => {
+                const hasNoDob = !s['วันเกิด'] || s['วันเกิด'].toString().trim() === '';
+                const hasClass = s['ชั้น/ห้อง'] && s['ชั้น/ห้อง'].toString().trim() !== '';
+                return hasNoDob && hasClass;
+            });
+
+            if (missingRegs.length === 0) {
+                showToast('ไม่มีข้อมูลนักเรียนที่ยังไม่ขึ้นระเบียนสำหรับพิมพ์', true);
+                return;
+            }
+
+            const groupedByClass = {};
+            missingRegs.forEach(s => {
+                const classRoom = s['ชั้น/ห้อง'];
+                if (!groupedByClass[classRoom]) groupedByClass[classRoom] = [];
+                groupedByClass[classRoom].push(s);
+            });
+
+            const sortedClasses = Object.keys(groupedByClass).sort();
+
+            let reportHTML = `
+                <!DOCTYPE html>
+                <html lang="th">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>รายงานนักเรียนที่ยังไม่ขึ้นระเบียน</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap');
+                        body { font-family: 'Prompt', sans-serif; padding: 30px; color: #333; background: #fff; line-height: 1.5; }
+                        h1 { text-align: center; color: #ea580c; margin-bottom: 5px; font-size: 24px;}
+                        .school-name { text-align: center; color: #555; margin-bottom: 20px; font-size: 16px;}
+                        .summary { text-align: center; font-size: 16px; margin-bottom: 30px; padding: 10px; background: #fff7ed; color: #c2410c; border-radius: 8px; font-weight: bold;}
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;}
+                        th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+                        th { background-color: #f8fafc; font-weight: 600; color: #ea580c; }
+                        .class-header { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #1e3a8a; border-left: 4px solid #ea580c; padding-left: 10px;}
+                        .print-date { text-align: right; font-size: 12px; color: #666; margin-bottom: 20px;}
+                        /* เพิ่มคลาสสำหรับขึ้นหน้าใหม่ */
+                        .page-break { page-break-before: always; }
+                    </style>
+                </head>
+                <body>
+            `;
+
+            sortedClasses.forEach((cr, index) => {
+                // แทรกตัวแบ่งหน้าเมื่อขึ้นห้องใหม่ (ยกเว้นห้องแรกสุด)
+                if (index > 0) {
+                    reportHTML += `<div class="page-break"></div>`;
+                }
+
+                // แสดงหัวรายงานในทุกๆ หน้าเพื่อให้รู้ว่าเป็นเอกสารอะไร
+                reportHTML += `
+                    <h1>รายงานนักเรียนที่ยังไม่ขึ้นระเบียน</h1>
+                    <div class="school-name">${systemSettings.schoolName || 'โรงเรียนนราสิกขาลัย'}</div>
+                    <div class="print-date">ข้อมูลพิมพ์ ณ วันที่: ${new Date().toLocaleString('th-TH')}</div>
+                `;
+
+                // กล่องสรุปยอดรวม จะแสดงเฉพาะหน้าแรกเท่านั้น
+                if (index === 0) {
+                    reportHTML += `<div class="summary">สรุปยอดรวม: พบนักเรียนที่ยังไม่ขึ้นระเบียน จำนวน ${missingRegs.length} คน</div>`;
+                }
+
+                reportHTML += `<div class="class-header">ระดับชั้น/ห้อง: ${cr} (จำนวน ${groupedByClass[cr].length} คน)</div>`;
+                reportHTML += `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="15%" style="text-align:center;">ลำดับ</th>
+                                <th width="30%">เลขประจำตัว</th>
+                                <th width="55%">ชื่อ-นามสกุล</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                groupedByClass[cr].forEach((s, idx) => {
+                    reportHTML += `
+                        <tr>
+                            <td style="text-align:center;">${idx + 1}</td>
+                            <td>${s['เลขประจำตัว']}</td>
+                            <td>${s['ชื่อ-สกุล']}</td>
+                        </tr>
+                    `;
+                });
+                reportHTML += `</tbody></table>`;
+            });
+
+            reportHTML += `
+                    <script>
+                        window.onload = function() {
+                            setTimeout(function() { window.print(); }, 500);
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `;
+
+            const printWin = window.open('', '_blank');
+            if (printWin) {
+                printWin.document.write(reportHTML);
+                printWin.document.close();
+            } else {
+                showToast('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาต Pop-up', true);
+            }
+        }
+
+        window.fixMissingReg = function(stuId) {
+            closeMissingRegReport();
+            nav('menu-students');
+            setTimeout(() => {
+                document.getElementById('search-stu-input').value = stuId;
+                searchStudentDB();
+                editStudentById(stuId);
+                showToast('ระบบได้เตรียมฟอร์มข้อมูลของนักเรียนรหัส ' + stuId + ' ให้เรียบร้อยแล้ว');
+                if(document.getElementById('stu-dob')) {
+                    document.getElementById('stu-dob').focus();
+                }
+            }, 300);
+        }
+
         let lastMissingPhotos = []; // เก็บแคชไว้สำหรับปริ้นท์
 
         // ==========================================
@@ -3185,16 +3398,31 @@
                         th { background-color: #f1f5f9; font-weight: 600; color: #1e3a8a; }
                         .class-header { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #1e3a8a; border-left: 4px solid #1e3a8a; padding-left: 10px;}
                         .print-date { text-align: right; font-size: 12px; color: #666; margin-bottom: 20px;}
+                        /* เพิ่มคลาสสำหรับขึ้นหน้าใหม่ */
+                        .page-break { page-break-before: always; }
                     </style>
                 </head>
                 <body>
+            `;
+
+            sortedClasses.forEach((cr, index) => {
+                // แทรกตัวแบ่งหน้าเมื่อขึ้นห้องใหม่ (ยกเว้นห้องแรกสุด)
+                if (index > 0) {
+                    reportHTML += `<div class="page-break"></div>`;
+                }
+
+                // แสดงหัวรายงานในทุกๆ หน้าเพื่อให้รู้ว่าเป็นเอกสารอะไร
+                reportHTML += `
                     <h1>รายงานการตรวจสอบรูปถ่ายนักเรียน</h1>
                     <div class="school-name">${systemSettings.schoolName || 'โรงเรียนนราสิกขาลัย'}</div>
                     <div class="print-date">ข้อมูลพิมพ์ ณ วันที่: ${new Date().toLocaleString('th-TH')}</div>
-                    <div class="summary">สรุปยอด: พบนักเรียนที่ยังไม่มีรูปถ่ายในระบบ จำนวน ${missingPhotos.length} คน</div>
-            `;
+                `;
 
-            sortedClasses.forEach(cr => {
+                // กล่องสรุปยอดรวม จะแสดงเฉพาะหน้าแรกเท่านั้น
+                if (index === 0) {
+                    reportHTML += `<div class="summary">สรุปยอด: พบนักเรียนที่ยังไม่มีรูปถ่ายในระบบ จำนวน ${missingPhotos.length} คน</div>`;
+                }
+
                 reportHTML += `<div class="class-header">ระดับชั้น/ห้อง: ${cr} (จำนวน ${groupedByClass[cr].length} คน)</div>`;
                 reportHTML += `
                     <table>
@@ -3207,10 +3435,10 @@
                         </thead>
                         <tbody>
                 `;
-                groupedByClass[cr].forEach((s, index) => {
+                groupedByClass[cr].forEach((s, idx) => {
                     reportHTML += `
                         <tr>
-                            <td style="text-align:center;">${index + 1}</td>
+                            <td style="text-align:center;">${idx + 1}</td>
                             <td>${s['เลขประจำตัว']}</td>
                             <td>${s['ชื่อ-สกุล']}</td>
                         </tr>
@@ -3839,6 +4067,20 @@
         async function refreshPrintData() {
             showLoading();
             document.getElementById('loading-msg').innerText = "กำลังอัปเดตข้อมูลล่าสุด...";
+            
+            // อัปเดตสถานะไอคอนที่มุมขวาบนเป็น "กำลังซิงค์..." และเปลี่ยนเป็นไฟสีส้มกะพริบ
+            const syncIndicator = document.getElementById('print-sync-status-indicator');
+            const syncDot = document.getElementById('print-sync-dot');
+            const syncText = document.getElementById('print-sync-text');
+            const syncBtnIcon = document.getElementById('print-sync-btn-icon');
+            
+            if (syncIndicator) {
+                syncIndicator.className = "flex items-center gap-2 text-xs font-semibold bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full border border-orange-200 transition-all duration-300";
+                if (syncDot) syncDot.className = "relative inline-flex rounded-full h-2 w-2 bg-orange-500";
+                if (syncText) syncText.innerText = "กำลังซิงค์ข้อมูล...";
+                if (syncBtnIcon) syncBtnIcon.classList.add('fa-spin');
+            }
+
             try {
                 const [resSet, resStu, resHis] = await Promise.all([
                     fetchJSONP('getSettings'),
@@ -3854,10 +4096,26 @@
                 if (resHis.status === 'success') allCardHistory = resHis.data || [];
                 
                 showToast('อัปเดตข้อมูลสำเร็จ พร้อมประมวลผลบัตร');
+                
+                // อัปเดตสถานะไอคอนกลับเป็นไฟสีเขียวใช้งานได้ปกติ
+                if (syncIndicator) {
+                    syncIndicator.className = "flex items-center gap-2 text-xs font-semibold bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200 transition-all duration-300";
+                    if (syncDot) syncDot.className = "relative inline-flex rounded-full h-2 w-2 bg-green-500";
+                    if (syncText) syncText.innerText = "เชื่อมต่อฐานข้อมูลแล้ว";
+                }
             } catch(e) {
                 console.error(e);
                 showToast('อัปเดตข้อมูลล้มเหลว', true);
+                
+                // กรณีล้มเหลวอัปเดตเป็นไฟสีแดงแสดงการขัดข้อง
+                if (syncIndicator) {
+                    syncIndicator.className = "flex items-center gap-2 text-xs font-semibold bg-red-50 text-red-700 px-3 py-1.5 rounded-full border border-red-200 transition-all duration-300";
+                    if (syncDot) syncDot.className = "relative inline-flex rounded-full h-2 w-2 bg-red-500";
+                    if (syncText) syncText.innerText = "การเชื่อมต่อขัดข้อง";
+                }
             }
+            
+            if (syncBtnIcon) syncBtnIcon.classList.remove('fa-spin');
             hideLoading();
         }
 
@@ -4095,30 +4353,46 @@
         async function renderSingleCard() {
             const id = document.getElementById('print-single-id').value;
             if(!id) return;
-            showToast('กำลังสร้างตัวอย่างบัตร...');
-            try {
-                const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
-                
-                if(stu) {
-                    const renderArea = document.getElementById('print-preview-content');
-                    renderArea.innerHTML = '';
-                    
-                    const cardData = generateCardHTML(stu, 'single');
-                    renderArea.innerHTML = cardData.html;
-                    
-                    document.getElementById('print-preview-modal').classList.remove('hidden');
-                    
-                    if (cardData.qrId) {
-                        setTimeout(() => { new QRCode(document.getElementById(cardData.qrId), { text: cardData.qrText, width: 120, height: 120 }); }, 100);
-                    }
-
-                    printQueue = [id]; 
-                } else {
-                    showToast('ไม่พบรหัสประจำตัวนี้', true);
-                }
-            } catch(e){
-                showToast('Error', true);
+            
+            // เปิดแสดงไอคอนประมวลผล
+            const syncImgIndicator = document.getElementById('print-image-sync-indicator');
+            if(syncImgIndicator) {
+                syncImgIndicator.classList.remove('hidden');
+                syncImgIndicator.classList.add('flex');
             }
+
+            setTimeout(() => {
+                showToast('กำลังสร้างตัวอย่างบัตร...');
+                try {
+                    const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
+                    
+                    if(stu) {
+                        const renderArea = document.getElementById('print-preview-content');
+                        renderArea.innerHTML = '';
+                        
+                        const cardData = generateCardHTML(stu, 'single');
+                        renderArea.innerHTML = cardData.html;
+                        
+                        document.getElementById('print-preview-modal').classList.remove('hidden');
+                        
+                        if (cardData.qrId) {
+                            setTimeout(() => { new QRCode(document.getElementById(cardData.qrId), { text: cardData.qrText, width: 120, height: 120 }); }, 100);
+                        }
+
+                        printQueue = [id]; 
+                    } else {
+                        showToast('ไม่พบรหัสประจำตัวนี้', true);
+                    }
+                } catch(e){
+                    showToast('Error', true);
+                } finally {
+                    // ปิดไอคอนประมวลผลเมื่อทำเสร็จ
+                    if(syncImgIndicator) {
+                        syncImgIndicator.classList.add('hidden');
+                        syncImgIndicator.classList.remove('flex');
+                    }
+                }
+            }, 50);
         }
 
         function searchGroupPrint() {
@@ -4158,24 +4432,41 @@
             if(selected.length === 0) { showToast('กรุณาเลือกนักเรียน', true); return; }
             printQueue = selected;
             
-            let htmlStr = ``;
-            let qrTasks = [];
-            
-            selected.forEach(id => {
-                const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
-                if(stu) {
-                    const cardData = generateCardHTML(stu, 'group');
-                    htmlStr += cardData.html;
-                    qrTasks.push(cardData);
-                }
-            });
-            
-            document.getElementById('print-preview-content').innerHTML = htmlStr;
-            document.getElementById('print-preview-modal').classList.remove('hidden');
+            // เปิดแสดงไอคอนประมวลผล
+            const syncImgIndicator = document.getElementById('print-image-sync-indicator');
+            if(syncImgIndicator) {
+                syncImgIndicator.classList.remove('hidden');
+                syncImgIndicator.classList.add('flex');
+            }
 
             setTimeout(() => {
-                qrTasks.forEach(task => { if (task.qrId) new QRCode(document.getElementById(task.qrId), { text: task.qrText, width: 120, height: 120 }); });
-            }, 100);
+                try {
+                    let htmlStr = ``;
+                    let qrTasks = [];
+                    
+                    selected.forEach(id => {
+                        const stu = allStudents.find(s => s['เลขประจำตัว'].toString() === id.toString());
+                        if(stu) {
+                            const cardData = generateCardHTML(stu, 'group');
+                            htmlStr += cardData.html;
+                            qrTasks.push(cardData);
+                        }
+                    });
+                    
+                    document.getElementById('print-preview-content').innerHTML = htmlStr;
+                    document.getElementById('print-preview-modal').classList.remove('hidden');
+
+                    setTimeout(() => {
+                        qrTasks.forEach(task => { if (task.qrId) new QRCode(document.getElementById(task.qrId), { text: task.qrText, width: 120, height: 120 }); });
+                    }, 100);
+                } finally {
+                    // ปิดไอคอนประมวลผลเมื่อทำเสร็จ
+                    if(syncImgIndicator) {
+                        syncImgIndicator.classList.add('hidden');
+                        syncImgIndicator.classList.remove('flex');
+                    }
+                }
+            }, 50);
         }
 
         function closePrintPreviewModal() {
@@ -4203,6 +4494,7 @@
             const pageOrientation = document.getElementById('print-paper-orientation').value;
             
             const paperDims = {
+                'PVC': { w: 54, h: 86 }, // เพิ่มขนาดมาตรฐานบัตร PVC
                 'A4': { w: 210, h: 297 },
                 'A3': { w: 297, h: 420 },
                 'Letter': { w: 215.9, h: 279.4 },
@@ -4221,14 +4513,20 @@
             const cardW = cardOrientation === 'landscape' ? 86 : 54; 
             const cardH = cardOrientation === 'landscape' ? 54 : 86; 
 
-            const paddingLeft = 2; 
-            const paddingTop = 2;  
+            // หากเลือกกระดาษเป็น PVC ให้บังคับขนาดกระดาษให้พอดีกับบัตร 1 ใบเสมอ และหมุนให้ตรงกันอัตโนมัติ
+            if (paperSizeName === 'PVC') {
+                pageW = cardW;
+                pageH = cardH;
+            }
+
+            const paddingLeft = paperSizeName === 'PVC' ? 0 : 2; 
+            const paddingTop = paperSizeName === 'PVC' ? 0 : 2;  
             const usableW = pageW - paddingLeft;
             const usableH = pageH - paddingTop;
             
-            const cols = Math.floor(usableW / cardW);
-            const rows = Math.floor(usableH / cardH);
-            const cardsPerPage = cols * rows;
+            const cols = Math.floor(usableW / cardW) || 1;
+            const rows = Math.floor(usableH / cardH) || 1;
+            const cardsPerPage = paperSizeName === 'PVC' ? 1 : cols * rows;
 
             if (cardsPerPage === 0) {
                 showToast('ขนาดกระดาษเล็กเกินไปสำหรับขนาดบัตร', true);
@@ -4243,12 +4541,17 @@
                     card.style.margin = '0';
                     card.style.border = 'none';
                     card.style.outline = 'none'; 
+                    card.style.boxShadow = 'none'; // ลบเงาออกตอนปริ้นเสมอ
+                    card.style.borderRadius = '0'; // ลบขอบมนออกให้ปริ้นเต็มขอบ
                     
+                    // ปิดมาร์คจุดตัดกระดาษ ถ้าพิมพ์บนบัตร PVC โดยตรง
+                    const cropMarksDisplay = paperSizeName === 'PVC' ? 'display:none;' : '';
+
                     card.innerHTML += `
-                        <div style="position:absolute; top:0; left:0; width:4mm; height:4mm; border-top:0.5px solid #555; border-left:0.5px solid #555; z-index:999; pointer-events:none;"></div>
-                        <div style="position:absolute; top:0; right:0; width:4mm; height:4mm; border-top:0.5px solid #555; border-right:0.5px solid #555; z-index:999; pointer-events:none;"></div>
-                        <div style="position:absolute; bottom:0; left:0; width:4mm; height:4mm; border-bottom:0.5px solid #555; border-left:0.5px solid #555; z-index:999; pointer-events:none;"></div>
-                        <div style="position:absolute; bottom:0; right:0; width:4mm; height:4mm; border-bottom:0.5px solid #555; border-right:0.5px solid #555; z-index:999; pointer-events:none;"></div>
+                        <div style="position:absolute; top:0; left:0; width:4mm; height:4mm; border-top:0.5px solid #555; border-left:0.5px solid #555; z-index:999; pointer-events:none; ${cropMarksDisplay}"></div>
+                        <div style="position:absolute; top:0; right:0; width:4mm; height:4mm; border-top:0.5px solid #555; border-right:0.5px solid #555; z-index:999; pointer-events:none; ${cropMarksDisplay}"></div>
+                        <div style="position:absolute; bottom:0; left:0; width:4mm; height:4mm; border-bottom:0.5px solid #555; border-left:0.5px solid #555; z-index:999; pointer-events:none; ${cropMarksDisplay}"></div>
+                        <div style="position:absolute; bottom:0; right:0; width:4mm; height:4mm; border-bottom:0.5px solid #555; border-right:0.5px solid #555; z-index:999; pointer-events:none; ${cropMarksDisplay}"></div>
                     `;
 
                     pagesHTML += card.outerHTML;
@@ -4279,14 +4582,14 @@
                             print-color-adjust: exact !important;
                         }
                         @page { 
-                            size: ${paperSizeName} ${pageOrientation}; 
+                            size: ${paperSizeName === 'PVC' ? `${pageW}mm ${pageH}mm` : `${paperSizeName} ${pageOrientation}`}; 
                             margin: 0; 
                         }
                         .print-page {
                             width: ${pageW}mm;
                             height: ${pageH}mm;
-                            padding-top: 2mm; 
-                            padding-left: 2mm; 
+                            padding-top: ${paddingTop}mm; 
+                            padding-left: ${paddingLeft}mm; 
                             page-break-after: always;
                             display: flex;
                             flex-wrap: wrap;
@@ -4326,6 +4629,52 @@
                 } catch(e){}
             }
         }
+
+        // --- ระบบเครื่องมือแก้ไขรูปถ่ายสำหรับ Print Preview ---
+        let currentEditImage = null;
+
+        function openPrintPhotoEditor(imgEl) {
+            currentEditImage = imgEl;
+            
+            // อ่านค่า Scale ปัจจุบัน
+            let currentScale = 1;
+            const transformStr = imgEl.style.transform || '';
+            const scaleMatch = transformStr.match(/scale\(([^)]+)\)/);
+            if (scaleMatch) currentScale = parseFloat(scaleMatch[1]);
+            
+            // อ่านค่า Brightness ปัจจุบัน
+            let currentBrightness = 100;
+            const filterStr = imgEl.style.filter || '';
+            const brightMatch = filterStr.match(/brightness\(([^)]+)%\)/);
+            if (brightMatch) currentBrightness = parseInt(brightMatch[1]);
+
+            document.getElementById('edit-photo-scale').value = currentScale;
+            document.getElementById('edit-photo-brightness').value = currentBrightness;
+            document.getElementById('edit-photo-filter').value = 'normal'; 
+            
+            document.getElementById('print-photo-editor-modal').classList.remove('hidden');
+        }
+
+        function applyPrintPhotoEdit() {
+            if (!currentEditImage) return;
+            const scale = document.getElementById('edit-photo-scale').value;
+            const brightness = document.getElementById('edit-photo-brightness').value;
+            const filterType = document.getElementById('edit-photo-filter').value;
+            
+            let saturate = 100, contrast = 100, blur = 0;
+            if (filterType === 'minimal') { saturate = 85; contrast = 110; }
+            else if (filterType === 'soft') { saturate = 105; contrast = 95; blur = 0.8; }
+            else if (filterType === 'warm') { saturate = 130; contrast = 100; }
+            
+            currentEditImage.style.transform = `scale(${scale})`;
+            currentEditImage.style.filter = `brightness(${brightness}%) saturate(${saturate}%) contrast(${contrast}%) blur(${blur}px)`;
+        }
+
+        function closePrintPhotoEditor() {
+            document.getElementById('print-photo-editor-modal').classList.add('hidden');
+            currentEditImage = null;
+        }
+
     </script>
 </body>
 </html>
